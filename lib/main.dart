@@ -1,17 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
+import 'features/auth/controllers/sesion_controller.dart';
 import 'screens/registro_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  runApp(const SamanDeportivoApp());
+  runApp(
+    // MultiProvider: aquí se registran TODOS los controllers globales.
+    // Si alguien necesita otro, lo agrega a esta lista (avisando al Gestor).
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          // lazy: false → el controller se crea al arrancar la app y empieza
+          // a escuchar la sesión de inmediato (por defecto Provider lo
+          // crearía recién cuando una pantalla lo pida).
+          lazy: false,
+          create: (_) => SesionController(),
+        ),
+      ],
+      child: const SamanDeportivoApp(),
+    ),
+  );
 }
 
 class SamanDeportivoApp extends StatelessWidget {
@@ -23,9 +38,7 @@ class SamanDeportivoApp extends StatelessWidget {
       title: 'Samán Deportivo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepOrange,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
         useMaterial3: true,
       ),
       home: const PantallaInicio(),
@@ -50,19 +63,12 @@ class PantallaInicio extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.sports,
-                size: 80,
-                color: Colors.deepOrange,
-              ),
+              const Icon(Icons.sports, size: 80, color: Colors.deepOrange),
               const SizedBox(height: 20),
               const Text(
                 '¡Bienvenido a Samán Deportivo!',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 25,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               const Text(
