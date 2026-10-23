@@ -72,3 +72,59 @@ test('usuario anonimo no puede consultar perfiles', async () => {
   const anon = env.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(anon, 'usuarios', 'uid-a')));
 });
+
+
+// Pruebas adicionales de Alexander: entrenador y administrador
+
+async function prepararEntrenador(uid) {
+  const correo = `${uid}@unimet.edu.ve`;
+
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'usuarios', uid), {
+      nombre: 'Entrenador Prueba',
+      correo,
+      cedula: '12345679',
+      rol: 'entrenador',
+      especialidad: 'Baloncesto',
+      aniosExperiencia: 5,
+    });
+  });
+
+  return env.authenticatedContext(uid, { email: correo }).firestore();
+}
+
+test('entrenador puede editar su propio nombre', async () => {
+  const coach = await prepararEntrenador('uid-coach-edit');
+
+  await assertSucceeds(
+    updateDoc(doc(coach, 'usuarios', 'uid-coach-edit'), {
+      nombre: 'Entrenador Actualizado',
+    }),
+  );
+});
+
+test('administrador puede editar su propio nombre', async () => {
+  await assertSucceeds(
+    updateDoc(doc(admin(), 'usuarios', 'uid-admin'), {
+      nombre: 'Administrador Actualizado',
+    }),
+  );
+});
+
+test('entrenador NO puede modificar su especialidad', async () => {
+  const coach = await prepararEntrenador('uid-coach-deny');
+
+  await assertFails(
+    updateDoc(doc(coach, 'usuarios', 'uid-coach-deny'), {
+      especialidad: 'Futbol',
+    }),
+  );
+});
+
+test('administrador NO puede cambiar su propio rol', async () => {
+  await assertFails(
+    updateDoc(doc(admin(), 'usuarios', 'uid-admin'), {
+      rol: 'estudiante',
+    }),
+  );
+});
