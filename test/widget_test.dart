@@ -5,7 +5,7 @@ import 'package:saman_deportivo/main.dart';
 void main() {
   testWidgets('Abrir el formulario de registro',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const SamanDeportivoApp());
+    await tester.pumpWidget(const MaterialApp(home: PantallaInicio()));
 
     expect(
       find.text('¡Bienvenido a Samán Deportivo!'),
