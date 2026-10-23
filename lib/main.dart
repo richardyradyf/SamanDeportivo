@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
+import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
 import 'features/auth/controllers/sesion_controller.dart';
 import 'screens/registro_screen.dart';
@@ -41,7 +42,8 @@ class SamanDeportivoApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
         useMaterial3: true,
       ),
-      home: const PantallaInicio(),
+      // El AuthGate decide la pantalla según la sesión y el rol.
+      home: const AuthGate(sinSesion: PantallaInicio()),
     );
   }
 }
