@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function esPropietario(uid) {
+      return autenticado() && request.auth.uid == uid;
+    }
+
+    function usuarioActual() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function esAdministrador() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && usuarioActual().rol == 'administrador';
+    }
+
+    // NO usar esta condición como prueba de solvencia UNIMET.
+    // El estado fue definido en el Hito 1, pero la validación institucional
+    // se integrará en Hito 3 mediante lógica privilegiada del servidor.
+    function nuevoEstudianteValido(uid) {
+      return esPropietario(uid)
+        && request.resource.data.keys().hasAll([
+          'uid', 'nombre', 'correo', 'cedula',
+          'carnet', 'estado', 'rol',
+          'especialidad', 'aniosExperiencia'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'uid', 'nombre', 'correo', 'cedula',
+          'carnet', 'estado', 'rol',
+          'especialidad', 'aniosExperiencia'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.rol == 'estudiante'
+        && request.resource.data.estado == 'inactivo'
+        && request.resource.data.especialidad == null
+        && request.resource.data.aniosExperiencia == null
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.correo is string
+        && request.resource.data.correo == request.auth.token.email
+        && request.resource.data.cedula is string
+        && request.resource.data.cedula.size() >= 5
+        && request.resource.data.cedula.size() <= 20
+        && request.resource.data.carnet is string
+        && request.resource.data.carnet.matches('^[a-zA-Z0-9-]{4,24}$');
+    }
+
+    function edicionPropiaValida() {
+      let cambiados = request.resource.data.diff(resource.data).affectedKeys();
+      return resource.data.rol in ['estudiante', 'entrenador', 'administrador']
+        && cambiados.hasOnly(resource.data.rol == 'estudiante'
+          ? ['nombre', 'carnet'] : ['nombre'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.nombre.size() <= 100
+        && (resource.data.rol != 'estudiante'
+          || (request.resource.data.carnet is string
+            && request.resource.data.carnet.matches('^[a-zA-Z0-9-]{4,24}$')));
+    }
+
+    match /usuarios/{uid} {
+      allow get: if esPropietario(uid) || esAdministrador();
+      allow list: if esAdministrador();
+      // Solo estudiantes pueden auto-registrarse. El administrador y el
+      // entrenador se aprovisionan de manera privilegiada (Firebase Console).
+      allow create: if nuevoEstudianteValido(uid);
+      // Ni siquiera el admin puede promover roles desde el cliente.
+      allow update: if esPropietario(uid) && edicionPropiaValida();
+      allow delete: if false;
+    }
+
+    // Hito 2: cerrado intencionalmente hasta integrar la lógica Hito 3.
+    // Agregar reglas por entidad de modo revisado, nunca allow write: if true.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
