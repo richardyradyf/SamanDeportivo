@@ -1,56 +1,55 @@
 import 'package:flutter/material.dart';
 
-import 'package:saman_deportivo/models/enums.dart';
-
-/// Primera pestaña de cada pantalla de inicio: saluda a la persona por su
-/// nombre y le recuerda con qué rol entró.
+/// Primera sección de cada pantalla de inicio: un saludo grande y, debajo,
+/// el contenido propio de cada rol (como en el Figma).
 class PanelBienvenida extends StatelessWidget {
-  const PanelBienvenida({
-    super.key,
-    required this.nombre,
-    required this.rol,
-    required this.mensaje,
-  });
+  const PanelBienvenida({super.key, required this.saludo, this.contenido});
 
-  final String nombre;
-  final Rol rol;
+  /// Texto completo del saludo, por ejemplo "Buenos días, Alejandro 👋".
+  final String saludo;
 
-  /// Texto corto con lo que esa persona puede hacer en la app.
-  final String mensaje;
+  /// Lo que va debajo del saludo (tarjetas, avisos...). Opcional.
+  final Widget? contenido;
 
-  /// "Ana María Pérez" -> "Ana". Si no hay nombre, solo "¡Hola!".
-  String get saludo {
-    final partes = nombre.trim().split(RegExp(r'\s+'));
-    final primerNombre = partes.first;
-    return primerNombre.isEmpty ? '¡Hola!' : '¡Hola, $primerNombre!';
+  /// "Buenos días" hasta las 11:59, "Buenas tardes" hasta las 18:59 y
+  /// "Buenas noches" desde las 19:00.
+  static String saludoSegunHora(DateTime hora) {
+    if (hora.hour < 12) return 'Buenos días';
+    if (hora.hour < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  }
+
+  /// "Ana María Pérez" -> "Ana".
+  static String primerNombre(String nombre) =>
+      nombre.trim().split(RegExp(r'\s+')).first;
+
+  /// Une el saludo con el primer nombre: "Hola" + "María Pérez" ->
+  /// "Hola, María". Si no hay nombre, deja solo el saludo.
+  static String componer(String inicio, String nombre) {
+    final primero = primerNombre(nombre);
+    return primero.isEmpty ? inicio : '$inicio, $primero';
   }
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+    final extra = contenido;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: Align(
+        alignment: Alignment.topLeft,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
+          constraints: const BoxConstraints(maxWidth: 1100),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.sports, size: 72, color: tema.colorScheme.primary),
-              const SizedBox(height: 16),
               Text(
                 saludo,
-                textAlign: TextAlign.center,
-                style: tema.textTheme.headlineMedium,
+                style: tema.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              const SizedBox(height: 8),
-              Chip(label: Text(rol.etiqueta)),
-              const SizedBox(height: 16),
-              Text(
-                mensaje,
-                textAlign: TextAlign.center,
-                style: tema.textTheme.bodyLarge,
-              ),
+              if (extra != null) ...[const SizedBox(height: 24), extra],
             ],
           ),
         ),

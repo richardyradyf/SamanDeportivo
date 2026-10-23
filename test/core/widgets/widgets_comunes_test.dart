@@ -2,39 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
-import 'package:saman_deportivo/models/enums.dart';
 
 Widget _enApp(Widget hijo) => MaterialApp(home: Scaffold(body: hijo));
 
 void main() {
   group('PanelBienvenida', () {
-    testWidgets('saluda con el primer nombre y muestra el rol', (tester) async {
-      await tester.pumpWidget(
-        _enApp(
-          const PanelBienvenida(
-            nombre: 'Ana María Pérez',
-            rol: Rol.estudiante,
-            mensaje: 'Bienvenida',
-          ),
-        ),
+    test('el saludo cambia según la hora del día', () {
+      expect(
+        PanelBienvenida.saludoSegunHora(DateTime(2026, 10, 22, 9)),
+        'Buenos días',
       );
-
-      expect(find.text('¡Hola, Ana!'), findsOneWidget);
-      expect(find.text('Estudiante'), findsOneWidget);
+      expect(
+        PanelBienvenida.saludoSegunHora(DateTime(2026, 10, 22, 15)),
+        'Buenas tardes',
+      );
+      expect(
+        PanelBienvenida.saludoSegunHora(DateTime(2026, 10, 22, 20)),
+        'Buenas noches',
+      );
     });
 
-    testWidgets('sin nombre saluda de forma genérica', (tester) async {
+    test('usa solo el primer nombre, y sin nombre deja el saludo solo', () {
+      expect(PanelBienvenida.componer('Hola', 'María Pérez'), 'Hola, María');
+      expect(PanelBienvenida.componer('Hola', '   '), 'Hola');
+    });
+
+    testWidgets('muestra el saludo y el contenido de debajo', (tester) async {
       await tester.pumpWidget(
         _enApp(
           const PanelBienvenida(
-            nombre: '  ',
-            rol: Rol.entrenador,
-            mensaje: 'Bienvenido',
+            saludo: 'Hola, Ana',
+            contenido: Text('Contenido del rol'),
           ),
         ),
       );
 
-      expect(find.text('¡Hola!'), findsOneWidget);
+      expect(find.text('Hola, Ana'), findsOneWidget);
+      expect(find.text('Contenido del rol'), findsOneWidget);
     });
   });
 
