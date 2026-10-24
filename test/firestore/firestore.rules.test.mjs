@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 
 let env;
 const datosA = {
@@ -129,54 +129,61 @@ test('administrador NO puede cambiar su propio rol', async () => {
   );
 });
 
-const nuevoRegistro = (uid, estado = 'inactivo') => ({
-  uid,
+const nuevoRegistro = (estado = 'activo') => ({
+  cedula: '12345678',
   nombre: 'Estudiante Registro',
   correo: 'registro@unimet.edu.ve',
-  cedula: '12345678',
-  carnet: '202644444',
   rol: 'estudiante',
+  carnet: '202644444',
   estado,
-  especialidad: null,
-  aniosExperiencia: null,
 });
 
-test('registro de estudiante compatible con UsuarioModel.toMap', async () => {
+test('estudiante puede registrarse activo con los 6 campos acordados', async () => {
   const uid = 'uid-registro-valido';
   const db = env.authenticatedContext(uid, {
     email: 'registro@unimet.edu.ve',
   }).firestore();
 
   await assertSucceeds(
-    setDoc(doc(db, 'usuarios', uid), nuevoRegistro(uid)),
+    setDoc(doc(db, 'usuarios', uid), nuevoRegistro()),
   );
 });
 
-test('estudiante NO puede registrarse directamente como activo', async () => {
-  const uid = 'uid-registro-activo';
+test('estudiante NO puede registrarse como inactivo', async () => {
+  const uid = 'uid-registro-inactivo';
   const db = env.authenticatedContext(uid, {
     email: 'registro@unimet.edu.ve',
   }).firestore();
 
   await assertFails(
-    setDoc(doc(db, 'usuarios', uid), nuevoRegistro(uid, 'activo')),
+    setDoc(doc(db, 'usuarios', uid), nuevoRegistro('inactivo')),
   );
 });
 
-test('registro antiguo de seis campos activos debe rechazarse', async () => {
-  const uid = 'uid-registro-antiguo';
+test('registro con 9 campos adicionales debe rechazarse', async () => {
+  const uid = 'uid-registro-nueve-campos';
   const db = env.authenticatedContext(uid, {
     email: 'registro@unimet.edu.ve',
   }).firestore();
 
   await assertFails(
     setDoc(doc(db, 'usuarios', uid), {
-      nombre: 'Estudiante Registro',
-      correo: 'registro@unimet.edu.ve',
-      cedula: '12345678',
-      carnet: '202644444',
-      rol: 'estudiante',
-      estado: 'activo',
+      ...nuevoRegistro(),
+      uid,
+      especialidad: null,
+      aniosExperiencia: null,
     }),
+  );
+});
+
+test('administrador puede listar usuarios', async () => {
+  await assertSucceeds(
+    getDocs(collection(admin(), 'usuarios')),
+  );
+});
+
+test('estudiante NO puede listar usuarios', async () => {
+  await assertFails(
+    getDocs(collection(estudiante(), 'usuarios')),
   );
 });

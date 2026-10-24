@@ -2,262 +2,303 @@
 
 ## 1. Descripción
 
-Implementación del módulo de perfil de usuario para la aplicación **Samán Deportivo**, desarrollada con Flutter, Firebase Authentication y Cloud Firestore.
+Implementación del módulo de perfil de usuario y propuesta de reglas de seguridad de Cloud Firestore para la aplicación Samán Deportivo.
 
-**Responsable:** Alexander
+**Responsable del módulo de perfil y de las pruebas de seguridad:** Alexander.
 
 El módulo permite:
 
-- Visualizar la información del usuario autenticado.
-- Modificar los campos autorizados según su rol.
-- Cerrar sesión mediante el controlador global de autenticación.
-- Consultar los datos almacenados en Cloud Firestore.
+- Consultar el perfil del usuario autenticado.
+- Mostrar información según el rol.
+- Editar únicamente los campos autorizados.
+- Cerrar sesión utilizando el controlador global.
+- Leer y actualizar información mediante Cloud Firestore.
 
-El módulo Flutter fue integrado satisfactoriamente en la rama `develop` mediante el **Pull Request #5**.
+El módulo Flutter fue integrado en `develop` mediante el PR #5.
 
-## 2. Arquitectura
+La propuesta de reglas de seguridad se desarrolla por separado en el PR #6.
 
-El módulo se encuentra en `lib/features/perfil/` y sigue una separación por responsabilidades.
+## 2. Arquitectura e integración
 
-| Archivo                                      | Responsabilidad                                             |
-| -------------------------------------------- | ----------------------------------------------------------- |
-| `domain/perfil_usuario.dart`                 | Modelo de datos del perfil y representación de roles        |
-| `data/perfil_repository.dart`                | Contrato de acceso a datos                                  |
-| `data/firestore_perfil_repository.dart`      | Acceso y actualización de perfiles mediante Cloud Firestore |
-| `presentation/perfil_screen.dart`            | Interfaz de visualización y edición del perfil              |
-| `presentation/perfil_con_sesion_screen.dart` | Integración con el controlador global `SesionController`    |
+El módulo se encuentra en `lib/features/perfil/`.
 
-La integración utiliza `Provider` y el controlador de sesión desarrollado por Gabriel.
+| Archivo                                      | Responsabilidad                                      |
+| -------------------------------------------- | ---------------------------------------------------- |
+| `domain/perfil_usuario.dart`                 | Modelo interno del perfil                            |
+| `data/perfil_repository.dart`                | Contrato de acceso a datos                           |
+| `data/firestore_perfil_repository.dart`      | Implementación del repositorio con Firestore         |
+| `presentation/perfil_screen.dart`            | Pantalla de consulta y edición                       |
+| `presentation/perfil_con_sesion_screen.dart` | Adaptador entre el perfil y el controlador de sesión |
 
-Se mantiene la separación entre la lógica del perfil y la navegación principal del proyecto.
+### Responsabilidades del equipo
+
+- **Alexander:** módulo de perfil, repositorio de perfil, interfaz, adaptador de sesión y pruebas de seguridad propuestas.
+- **Richard:** jerarquía de modelos `Persona`, `Estudiante`, `Entrenador` y `Administrador`, y `SesionController`.
+- **Mariana:** `UsuarioModel`, `UsuarioService` y flujo de registro de estudiantes.
+- **Gabriel:** `AuthGate`, navegación por roles e integración del perfil en las pantallas principales.
+
+### Integración de navegación
+
+Gabriel integró directamente `PerfilScreen` en el `AuthGate` para las pestañas de perfil de estudiantes y entrenadores, utilizando el UID y la función de cierre de sesión del controlador global.
+
+Esta integración se encuentra en el PR #7, pendiente de fusionarse a `develop` al momento de esta actualización.
+
+`PerfilConSesionScreen` permanece disponible, pero no necesita reemplazar la integración directa realizada por Gabriel.
 
 ## 3. Roles y permisos
 
-El sistema contempla tres roles: Estudiante, Entrenador y Administrador.
+| Operación                                       | Estudiante | Entrenador | Administrador        |
+| ----------------------------------------------- | ---------- | ---------- | -------------------- |
+| Leer perfil propio                              | Sí         | Sí         | Sí                   |
+| Editar nombre propio                            | Sí         | Sí         | Sí                   |
+| Editar carnet propio                            | Sí         | No         | No                   |
+| Leer otros perfiles mediante get                | No         | No         | Sí                   |
+| Listar usuarios                                 | No         | No         | Sí                   |
+| Modificar cédula                                | No         | No         | No                   |
+| Modificar rol                                   | No         | No         | No                   |
+| Modificar estado de estudiantes                 | No         | No         | No, pendiente Hito 3 |
+| Crear perfiles de entrenadores desde el cliente | No         | No         | No, pendiente Hito 3 |
+| Eliminar perfiles desde el cliente              | No         | No         | No                   |
 
-| Funcionalidad                   | Estudiante | Entrenador | Administrador |
-| ------------------------------- | ---------- | ---------- | ------------- |
-| Consultar perfil propio         | Sí         | Sí         | Sí            |
-| Editar nombre propio            | Sí         | Sí         | Sí            |
-| Editar carnet propio            | Sí         | No         | No            |
-| Modificar cédula                | No         | No         | No            |
-| Modificar rol                   | No         | No         | No            |
-| Modificar estado del estudiante | No         | No         | No            |
-| Cerrar sesión                   | Sí         | Sí         | Sí            |
-
-Las reglas locales propuestas también permiten que los administradores consulten otros perfiles. Esta autorización requiere revisión del equipo antes del despliegue.
+Los permisos administrativos de modificación y creación de usuarios privilegiados se implementarán durante el Hito 3.
 
 ## 4. Estructura de Cloud Firestore
 
 **Colección:** `usuarios`
 
-El identificador del documento debe coincidir con el UID proporcionado por Firebase Authentication.
+El identificador del documento corresponde al UID de Firebase Authentication.
 
-### Campos generales
+### 4.1. Modelo de estudiante
 
-- `uid`: identificador de usuario.
-- `nombre`: nombre completo.
-- `cedula`: documento de identidad.
-- `correo`: correo electrónico.
-- `rol`: `estudiante`, `entrenador` o `administrador`.
+El esquema de autorregistro aprobado por el equipo es el generado por `Estudiante.toMap()`.
 
-### Campos específicos del estudiante
+El documento contiene exactamente seis campos:
 
-- `carnet`: número de carnet estudiantil.
-- `estado`: `activo` o `inactivo`.
+| Campo    | Tipo   | Descripción            |
+| -------- | ------ | ---------------------- |
+| `cedula` | String | Documento de identidad |
+| `nombre` | String | Nombre completo        |
+| `correo` | String | Correo del usuario     |
+| `rol`    | String | Debe ser `estudiante`  |
+| `carnet` | String | Carnet estudiantil     |
+| `estado` | String | Inicialmente `activo`  |
 
-### Campos específicos del entrenador
+**El campo `uid` no se almacena dentro del documento.** Se utiliza exclusivamente como identificador de `usuarios/{uid}`.
 
-- `especialidad`: disciplina deportiva.
-- `aniosExperiencia`: cantidad de años de experiencia.
+Los campos `especialidad` y `aniosExperiencia` no forman parte del documento de registro del estudiante.
 
-### Compatibilidad con UsuarioModel
+### 4.2. Estado inicial
 
-Las reglas propuestas de creación de estudiantes fueron adaptadas al método `UsuarioModel.toMap()` implementado por Richard.
+El equipo estableció que:
 
-El documento de registro incluye nueve campos:
+- Todo estudiante nuevo comienza con `estado: activo`.
+- El propio estudiante no puede modificar su estado.
+- Solo el administrador podrá inactivar estudiantes mediante una funcionalidad del Hito 3.
 
-1. `uid`
-2. `nombre`
-3. `cedula`
-4. `correo`
-5. `rol`
-6. `carnet`
-7. `estado`
-8. `especialidad`
-9. `aniosExperiencia`
+El estado `activo` representa la decisión funcional acordada para este proyecto; no debe interpretarse por sí solo como una validación institucional externa.
 
-Durante el autorregistro de estudiantes, los campos `especialidad` y `aniosExperiencia` deben contener `null`.
+### 4.3. Diferencia con el modelo anterior
 
-El campo `uid` debe coincidir con el identificador del usuario autenticado.
+`UsuarioModel.toMap()` genera nueve campos, mientras que el modelo aprobado `Estudiante.toMap()` genera seis.
 
-## 5. Seguridad de Firestore
+Por lo tanto, las reglas de autorregistro propuestas aceptan exclusivamente el formato de seis campos.
 
-Las reglas propuestas se encuentran en `firestore.rules`.
+**Pendiente de Mariana:** actualizar y probar el servicio de registro para que guarde el formato aprobado y utilice `estado: activo`.
 
-Se implementan controles para:
+## 5. Reglas de seguridad de Firestore
 
-- Exigir autenticación para acceder a perfiles.
-- Restringir las modificaciones al propietario del documento.
-- Validar los campos editables según el rol.
-- Impedir cambios no autorizados de rol, cédula y estado.
-- Impedir el autorregistro como entrenador o administrador.
-- Bloquear la eliminación de perfiles desde el cliente.
-- Validar la estructura y los tipos de los datos de registro.
+Las reglas propuestas están implementadas en:
 
-### Registro de estudiantes
+`firestore.rules`
 
-Las reglas locales propuestas exigen que los nuevos estudiantes sean registrados con:
+### 5.1. Lectura de usuarios
 
-`estado: inactivo`
+- Los usuarios autenticados pueden leer su propio perfil.
+- Los administradores pueden consultar perfiles de otros usuarios mediante `get`.
+- Los administradores pueden listar documentos de la colección `usuarios` mediante `list`.
+- Los estudiantes y entrenadores no tienen permisos generales de listado.
+- Los usuarios no autenticados no tienen acceso a perfiles.
 
-Este criterio es compatible con el método `UsuarioService.guardarUsuario()` desarrollado por Richard y con las reglas publicadas originalmente en Firebase.
+### 5.2. Creación de estudiantes
 
-**Importante:** esta política sigue pendiente de confirmación con Richard y el equipo.
+La regla `nuevoEstudianteValido(uid)` exige:
 
-La clase `Estudiante` actualmente utiliza `activo` como valor predeterminado, por lo que todavía existe una inconsistencia entre el modelo de dominio y el servicio de registro.
+- Que el UID autenticado coincida con el ID del documento.
+- Que el documento contenga exactamente los seis campos acordados.
+- Que el rol sea `estudiante`.
+- Que el estado inicial sea `activo`.
+- Que el correo coincida con el correo de Firebase Authentication.
+- Que el nombre, la cédula y el carnet cumplan las validaciones establecidas.
 
-La activación del estudiante no debe depender únicamente de un valor enviado por el cliente. El mecanismo definitivo de validación o habilitación institucional deberá definirse por el equipo.
+Los usuarios no pueden registrarse como entrenadores o administradores desde el cliente.
 
-### Limitaciones de las reglas propuestas
+### 5.3. Edición de perfiles
 
-Las reglas locales están enfocadas en la colección `usuarios`.
+Las reglas permiten:
 
-Las demás colecciones permanecen bloqueadas mediante una regla general de denegación. Por este motivo, las reglas propuestas no deben considerarse listas para sustituir automáticamente la configuración de seguridad del proyecto completo.
+- Estudiantes: editar nombre y carnet propios.
+- Entrenadores: editar su nombre.
+- Administradores: editar su nombre.
 
-**No ejecutar `firebase deploy --only firestore:rules` sin autorización y coordinación con el equipo.**
+No se permiten cambios de rol, cédula o estado desde las operaciones ordinarias de actualización del perfil.
 
-## 6. Pruebas automatizadas de seguridad
+Tampoco se permite eliminar documentos de usuario desde el cliente.
 
-Las pruebas de Firestore se encuentran en:
+### 5.4. Denegación general
+
+Se mantiene:
+
+`match /{document=**} { allow read, write: if false; }`
+
+Esta denegación general constituye la política de cierre por defecto de las colecciones todavía no implementadas.
+
+Durante el Hito 3 se incorporarán reglas específicas para las nuevas colecciones.
+
+### 5.5. Despliegue
+
+Las reglas deben probarse en el emulador antes de desplegarse.
+
+**El despliegue a Firebase compartido corresponde a Mariana**, después de verificar el flujo completo de registro y recibir la aprobación del equipo.
+
+No realizar despliegues independientes desde la rama de Alexander.
+
+## 6. Pruebas automatizadas
+
+Archivo de pruebas:
 
 `test/firestore/firestore.rules.test.mjs`
 
-Se utilizan Firebase Emulator Suite y el proyecto ficticio:
-
-`demo-saman-perfil`
-
-La configuración independiente del emulador se encuentra en:
+Archivo de configuración:
 
 `firebase.security.test.json`
 
-Para ejecutar las pruebas:
+Proyecto de pruebas:
 
-`npm run test:rules`
+`demo-saman-perfil`
 
-### Cobertura implementada
+### Ejecución
 
-- Lectura del perfil propio.
+```bash
+npm ci
+npm run test:rules
+```
+
+Las pruebas usan Firebase Emulator Suite y no modifican la base de datos compartida.
+
+### Cobertura
+
+- Consulta del perfil propio.
 - Bloqueo de lectura de perfiles ajenos para estudiantes.
 - Edición de nombre y carnet del estudiante.
-- Protección contra cambios de rol.
-- Protección contra cambios de cédula y estado.
-- Bloqueo de creación no autorizada de entrenadores.
-- Lectura administrativa según las reglas locales.
+- Bloqueo de cambios de rol.
+- Bloqueo de cambios de cédula y estado.
+- Bloqueo de creación de entrenadores.
+- Lectura de otros perfiles por administradores.
 - Bloqueo de usuarios anónimos.
-- Edición de nombre para entrenadores.
-- Edición de nombre para administradores.
-- Protección de especialidad del entrenador.
-- Protección del rol del administrador.
-- Registro compatible con `UsuarioModel.toMap()`.
-- Rechazo del autorregistro directamente como estudiante activo.
-- Rechazo del formato antiguo de seis campos con estado activo.
+- Edición del nombre de entrenadores.
+- Edición del nombre de administradores.
+- Bloqueo de modificación de especialidad.
+- Bloqueo de modificación del rol administrativo.
+- Autorregistro válido con seis campos y estado activo.
+- Rechazo del autorregistro con estado inactivo.
+- Rechazo de documentos de registro con nueve campos.
+- Listado de usuarios por administradores.
+- Bloqueo del listado de usuarios para estudiantes.
 
-### Resultados
+**Total de casos previstos: 17.**
 
-**Última ejecución: 23 de octubre de 2026.**
+**Resultado de la versión corregida: 17 pruebas aprobadas, 0 fallidas, utilizando Firebase Emulator Suite.**
 
-| Métrica            | Resultado               |
-| ------------------ | ----------------------- |
-| Pruebas ejecutadas | 15                      |
-| Pruebas aprobadas  | 15                      |
-| Pruebas fallidas   | 0                       |
-| Entorno            | Firebase Emulator Suite |
-| Proyecto           | `demo-saman-perfil`     |
+Los mensajes `PERMISSION_DENIED` en pruebas negativas son esperados cuando las operaciones prohibidas se rechazan correctamente.
 
-Los mensajes `PERMISSION_DENIED` registrados durante las pruebas negativas son esperados y verifican que las reglas rechazan las operaciones prohibidas.
+## 7. Validación del módulo Flutter
 
-Las pruebas se ejecutaron localmente y no modificaron la base de datos real de Firebase.
+El PR #5 fue fusionado correctamente a `develop`.
 
-Estas pruebas validan los escenarios incluidos en la cobertura, pero no sustituyen una auditoría completa de seguridad ni las pruebas de integración del proyecto completo.
+Resultados de validación posteriores a la integración:
 
-## 7. Integración con el proyecto Flutter
+| Verificación                           | Resultado            |
+| -------------------------------------- | -------------------- |
+| `dart analyze`                         | Sin problemas        |
+| `flutter test`                         | 8 pruebas aprobadas  |
+| Inicio de sesión con cuentas de prueba | Validado manualmente |
+| Consulta de información según rol      | Validado manualmente |
+| Edición de campos permitidos           | Validado manualmente |
+| Cierre de sesión                       | Validado manualmente |
 
-El módulo fue integrado mediante el **PR #5**, fusionado en la rama `develop`.
+La integración de navegación desarrollada por Gabriel se encuentra en el PR #7.
 
-La integración incluye:
+## 8. Riesgos y tareas pendientes
 
-- Pantallas de perfil para los tres roles.
-- Edición de información autorizada.
-- Acceso a Cloud Firestore.
-- Integración con `SesionController`.
-- Manejo del estado de autenticación.
-- Cierre de sesión.
-- Pruebas automatizadas del módulo.
+### 8.1. Normalización del correo electrónico
 
-### Validación posterior a la integración
+Las reglas comparan el correo almacenado en Firestore con `request.auth.token.email`.
 
-Se ejecutaron las siguientes verificaciones sobre `develop`:
+Para evitar diferencias de mayúsculas, Mariana deberá normalizar el correo antes de almacenarlo:
 
-| Verificación                           | Resultado           |
-| -------------------------------------- | ------------------- |
-| `dart analyze`                         | Sin problemas       |
-| `flutter test`                         | 8 pruebas aprobadas |
-| Integración manual de inicio de sesión | Correcta            |
-| Visualización de perfiles por rol      | Correcta            |
-| Edición de información por rol         | Correcta            |
-| Cierre de sesión                       | Correcto            |
+`correo.trim().toLowerCase()`
 
-La navegación definitiva hacia el módulo de perfil todavía debe conectarse desde la interfaz principal de la aplicación en coordinación con Gabriel y Richard.
+También debe verificarse que el correo usado durante el registro en Firebase Authentication sea consistente.
 
-## 8. Diferencias y decisiones pendientes
+**Responsable:** Mariana.
 
-Antes de desplegar las reglas de seguridad propuestas, el equipo deberá revisar los siguientes puntos.
+### 8.2. Duplicidad de cédula y carnet
 
-### 8.1 Estado inicial del estudiante
+Las reglas actuales no garantizan unicidad de cédulas o carnets.
 
-- `UsuarioService` requiere `inactivo`.
-- La clase `Estudiante` utiliza `activo` por defecto.
-- Las reglas locales propuestas requieren `inactivo`.
+Tampoco se debe permitir que los estudiantes consulten libremente los documentos de otros usuarios para comprobar duplicados.
 
-**Pendiente:** confirmar el estado inicial y el mecanismo autorizado para la activación del estudiante.
+La validación de unicidad deberá resolverse mediante un mecanismo confiable definido por el equipo, con operaciones privilegiadas o índices de reserva protegidos.
 
-### 8.2 Permisos administrativos
+**Responsable de coordinación:** Mariana.
 
-Las reglas propuestas permiten a los administradores consultar otros perfiles.
+**Hito propuesto:** Hito 3.
 
-**Pendiente:** confirmar si esta capacidad forma parte de los requisitos funcionales y definir su alcance.
+### 8.3. Modificación administrativa
 
-### 8.3 Reglas de las demás colecciones
+Durante el Hito 3 se implementarán permisos específicos para que el administrador pueda:
 
-Las reglas locales actuales bloquean colecciones distintas de `usuarios`.
+- Cambiar el estado de estudiantes.
+- Crear o gestionar entrenadores.
+- Realizar las operaciones administrativas autorizadas.
 
-**Pendiente:** integrar las reglas de seguridad de los demás módulos sin eliminar permisos legítimos ni introducir accesos excesivos.
+Estos permisos no están incluidos en las reglas actuales.
 
-### 8.4 Publicación de reglas
+### 8.4. Modelos de perfil duplicados
 
-**Pendiente:** comparar las reglas propuestas con las actualmente publicadas en Firebase y obtener aprobación del responsable del proyecto antes del despliegue.
+El módulo de Alexander utiliza `PerfilUsuario` y `RolPerfil`, mientras que la arquitectura compartida dispone de `Persona` y sus subclases.
+
+La implementación actual es funcional, pero la unificación de modelos puede evaluarse como refactorización del Hito 3.
+
+### 8.5. Consolidación de seguridad
+
+Antes de desplegar, se debe comparar la propuesta con las reglas efectivamente publicadas en Firebase.
+
+Las reglas de las nuevas colecciones deberán incorporarse sin introducir accesos excesivos ni eliminar permisos necesarios.
 
 ## 9. Estado de entrega
 
-| Entregable                                            | Estado               |
-| ----------------------------------------------------- | -------------------- |
-| Módulo Flutter de perfil                              | Completado           |
-| Integración con `SesionController`                    | Completada           |
-| Integración en `develop` — PR #5                      | Fusionada            |
-| Pruebas Flutter                                       | 8 aprobadas          |
-| Reglas locales de seguridad                           | Implementadas        |
-| Compatibilidad de registro con `UsuarioModel.toMap()` | Validada en emulador |
-| Pruebas de seguridad Firebase                         | 15 aprobadas         |
-| Navegación definitiva al perfil                       | Pendiente            |
-| Aprobación de política de activación                  | Pendiente            |
-| Reconciliación de reglas compartidas                  | Pendiente            |
-| Despliegue de reglas a Firebase                       | No realizado         |
+| Entregable                            | Estado                                  |
+| ------------------------------------- | --------------------------------------- |
+| Módulo Flutter de perfil              | Completado                              |
+| Integración Flutter mediante PR #5    | Fusionado                               |
+| Integración con controlador de sesión | Validada                                |
+| Navegación por roles de Gabriel       | PR #7 pendiente de merge                |
+| Reglas de seguridad por roles         | Implementadas; ajustes en revisión      |
+| Registro con seis campos activos      | Definido por el equipo                  |
+| Pruebas de seguridad corregidas       | Pendientes de confirmación de ejecución |
+| Permisos de lectura administrativa    | Definidos                               |
+| Normalización de correo en registro   | Pendiente de Mariana                    |
+| Validación de unicidad                | Pendiente para Hito 3                   |
+| Permisos administrativos avanzados    | Pendientes para Hito 3                  |
+| Despliegue de reglas                  | Pendiente de Mariana                    |
 
-### Consideraciones finales
+## 10. Conclusión
 
-Las pruebas realizadas demuestran que los escenarios implementados funcionan correctamente en los entornos evaluados.
+La funcionalidad de perfil de Alexander se encuentra integrada en `develop`.
 
-Sin embargo, las reglas de seguridad todavía requieren revisión conjunta antes de ser publicadas en Firebase.
+Las reglas de seguridad propuestas para el Hito 2 establecen controles de autenticación, autorización por rol y restricciones de modificación de perfiles.
 
-El módulo Flutter y la propuesta de seguridad se mantienen como entregables separados para facilitar su revisión y evitar interferencias con el trabajo de los demás integrantes.
+La versión final de las reglas deberá validarse con las pruebas automatizadas y con el flujo de registro de Mariana antes de su aprobación para despliegue.
+
+La integración debe mantenerse coordinada con el resto del equipo, preservando las responsabilidades y decisiones de arquitectura acordadas.

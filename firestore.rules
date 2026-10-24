@@ -25,20 +25,13 @@ service cloud.firestore {
     function nuevoEstudianteValido(uid) {
       return esPropietario(uid)
         && request.resource.data.keys().hasAll([
-          'uid', 'nombre', 'correo', 'cedula',
-          'carnet', 'estado', 'rol',
-          'especialidad', 'aniosExperiencia'
+          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
         ])
         && request.resource.data.keys().hasOnly([
-          'uid', 'nombre', 'correo', 'cedula',
-          'carnet', 'estado', 'rol',
-          'especialidad', 'aniosExperiencia'
+          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
         ])
-        && request.resource.data.uid == uid
         && request.resource.data.rol == 'estudiante'
-        && request.resource.data.estado == 'inactivo'
-        && request.resource.data.especialidad == null
-        && request.resource.data.aniosExperiencia == null
+        && request.resource.data.estado == 'activo'
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 2
         && request.resource.data.nombre.size() <= 100
@@ -50,6 +43,7 @@ service cloud.firestore {
         && request.resource.data.carnet is string
         && request.resource.data.carnet.matches('^[a-zA-Z0-9-]{4,24}$');
     }
+
 
     function edicionPropiaValida() {
       let cambiados = request.resource.data.diff(resource.data).affectedKeys();
