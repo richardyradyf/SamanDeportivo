@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 /// Una sección de la navegación principal (por ejemplo "Explorar" o "Perfil").
 class DestinoNavegacion {
   const DestinoNavegacion({
@@ -77,7 +79,11 @@ class _LayoutResponsivoState extends State<LayoutResponsivo> {
   }
 
   /// Marca y rol que encabezan el menú lateral (como en el Figma).
-  Widget _encabezado(BuildContext context, {required bool compacto}) {
+  Widget _encabezado(
+    BuildContext context, {
+    required bool compacto,
+    bool oscuro = false,
+  }) {
     final tema = Theme.of(context);
     final subtitulo = widget.subtitulo;
     return Padding(
@@ -93,13 +99,21 @@ class _LayoutResponsivoState extends State<LayoutResponsivo> {
                 (compacto
                         ? tema.textTheme.labelLarge
                         : tema.textTheme.titleLarge)
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                    ?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: oscuro ? Colors.white : tema.colorScheme.onSurface,
+                    ),
           ),
           if (!compacto && subtitulo != null) ...[
             const SizedBox(height: 4),
             Text(
               subtitulo.toUpperCase(),
-              style: tema.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
+              style: tema.textTheme.labelSmall?.copyWith(
+                letterSpacing: 1.2,
+                color: oscuro
+                    ? AppColors.sidebarRol
+                    : tema.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ],
@@ -184,14 +198,25 @@ class _LayoutResponsivoState extends State<LayoutResponsivo> {
                 labelType: expandido
                     ? NavigationRailLabelType.none
                     : NavigationRailLabelType.all,
-                leading: _encabezado(context, compacto: !expandido),
+                leading: _encabezado(
+                  context,
+                  compacto: !expandido,
+                  oscuro: true,
+                ),
                 trailing: widget.acciones.isEmpty
                     ? null
                     : Padding(
                         padding: const EdgeInsets.only(top: 16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: widget.acciones,
+                        child: IconButtonTheme(
+                          data: IconButtonThemeData(
+                            style: IconButton.styleFrom(
+                              foregroundColor: AppColors.sidebarTexto,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: widget.acciones,
+                          ),
                         ),
                       ),
                 destinations: [

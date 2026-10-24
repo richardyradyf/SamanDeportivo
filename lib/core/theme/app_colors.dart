@@ -21,6 +21,15 @@ abstract final class AppColors {
   /// Verde muy oscuro del menú lateral y del panel izquierdo del login.
   static const Color primarioOscuro = Color(0xFF05291A);
 
+  /// Figma 13 — Perfil estudiante: fondo de destino seleccionado.
+  static const Color sidebarSeleccion = Color(0xFF144730);
+
+  /// Figma: texto e iconos de destinos no seleccionados.
+  static const Color sidebarTexto = Color(0xFFC7DBCF);
+
+  /// Figma: etiqueta del rol debajo de SAMÁN.
+  static const Color sidebarRol = Color(0xFFA1C2AD);
+
   /// "Soft": fondos suaves (etiqueta "Disponible", avatar del perfil).
   static const Color suave = Color(0xFFE3F2E8);
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:saman_deportivo/core/theme/app_colors.dart';
+import 'package:saman_deportivo/core/theme/app_theme.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 
 const _dosDestinos = [
@@ -38,6 +40,7 @@ Future<void> _mostrar(
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
+      theme: AppTheme.claro,
       home: LayoutResponsivo(
         titulo: 'Samán',
         subtitulo: 'Estudiante',
@@ -131,5 +134,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_seccionVisible(tester), 1);
+  });
+
+  testWidgets('en escritorio aparece fondo oscuro y marca blanca', (
+    tester,
+  ) async {
+    await _mostrar(tester, 1280);
+
+    final rail = find.byType(NavigationRail);
+    final contexto = tester.element(rail);
+    final estilo = Theme.of(contexto).navigationRailTheme;
+    expect(estilo.backgroundColor, AppColors.primarioOscuro);
+    expect(estilo.indicatorColor, AppColors.sidebarSeleccion);
+    expect(tester.widget<Text>(find.text('SAMÁN')).style?.color, Colors.white);
+    expect(
+      tester.widget<Text>(find.text('ESTUDIANTE')).style?.color,
+      AppColors.sidebarRol,
+    );
+  });
+
+  testWidgets('en movil el menu desplegable mantiene la marca oscura', (
+    tester,
+  ) async {
+    await _mostrar(tester, 400, destinos: _seisDestinos);
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationDrawer), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('SAMÁN')).style?.color,
+      AppColors.texto,
+    );
   });
 }
