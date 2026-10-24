@@ -6,6 +6,7 @@ import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
 import 'features/auth/controllers/sesion_controller.dart';
 import 'screens/registro_screen.dart';
+import 'core/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,12 +39,10 @@ class SamanDeportivoApp extends StatelessWidget {
     return MaterialApp(
       title: 'Samán Deportivo',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
-        useMaterial3: true,
+      theme: AppTheme.claro,
+      home: const AuthGate(
+        sinSesion: PantallaInicio(),
       ),
-      // El AuthGate decide la pantalla según la sesión y el rol.
-      home: const AuthGate(sinSesion: PantallaInicio()),
     );
   }
 }
