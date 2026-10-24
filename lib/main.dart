@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
+import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
 import 'features/auth/controllers/sesion_controller.dart';
 import 'screens/registro_screen.dart';
@@ -38,8 +39,10 @@ class SamanDeportivoApp extends StatelessWidget {
     return MaterialApp(
       title: 'Samán Deportivo',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.claro, //Sistema de diseño del Figma
-      home: const PantallaInicio(),
+      theme: AppTheme.claro,
+      home: const AuthGate(
+        sinSesion: PantallaInicio(),
+      ),
     );
   }
 }
