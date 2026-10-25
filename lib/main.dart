@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
 import 'features/auth/controllers/sesion_controller.dart';
+import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/registro_screen.dart';
 import 'core/theme/app_theme.dart';
 
@@ -41,7 +42,7 @@ class SamanDeportivoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.claro,
       home: const AuthGate(
-        sinSesion: PantallaInicio(),
+        sinSesion:  LoginScreen(),
       ),
     );
   }
