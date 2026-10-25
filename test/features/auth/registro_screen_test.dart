@@ -82,6 +82,7 @@ void main() {
 
       await tester.ensureVisible(boton);
       await tester.pumpAndSettle();
+
       await tester.tap(boton);
       await tester.pumpAndSettle();
 
@@ -118,6 +119,7 @@ void main() {
 
       await tester.ensureVisible(boton);
       await tester.pumpAndSettle();
+
       await tester.tap(boton);
       await tester.pumpAndSettle();
 
@@ -128,9 +130,10 @@ void main() {
     },
   );
 
-  // PRUEBA 5: Verificar que el formulario acepte datos válidos.
+  // PRUEBA 5: Verificar que el carnet es obligatorio.
+  // No realiza solicitudes reales a Firebase.
   testWidgets(
-    'El registro valida correctamente los datos',
+    'El registro exige numero de carnet',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -142,11 +145,13 @@ void main() {
 
       await tester.enterText(campos.at(0), 'Mariana Perez');
       await tester.enterText(campos.at(1), '12345678');
-      await tester.enterText(campos.at(2), '20260001');
+
+      // Dejamos vacío el campo de carnet (posición 2).
       await tester.enterText(
         campos.at(3),
         'estudiante@unimet.edu.ve',
       );
+
       await tester.enterText(campos.at(4), 'Clave123');
       await tester.enterText(campos.at(5), 'Clave123');
 
@@ -154,13 +159,12 @@ void main() {
 
       await tester.ensureVisible(boton);
       await tester.pumpAndSettle();
+
       await tester.tap(boton);
       await tester.pumpAndSettle();
 
       expect(
-        find.text(
-          'Datos validados. Registro en Firebase pendiente.',
-        ),
+        find.text('Este campo es obligatorio'),
         findsOneWidget,
       );
     },
