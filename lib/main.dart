@@ -42,7 +42,7 @@ class SamanDeportivoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.claro,
       home: const AuthGate(
-        sinSesion: const LoginScreen(),
+        sinSesion:  LoginScreen(),
       ),
     );
   }
