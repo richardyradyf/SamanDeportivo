@@ -28,6 +28,7 @@ class _FormularioRegistro extends StatefulWidget {
 class _FormularioRegistroState extends State<_FormularioRegistro> {
   final _formKey = GlobalKey<FormState>();
 
+  // Controladores de los campos del formulario.
   final _nombreController = TextEditingController();
   final _cedulaController = TextEditingController();
   final _carnetController = TextEditingController();
@@ -46,7 +47,7 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
     super.dispose();
   }
 
-  // Realizar el registro del estudiante.
+  // Registrar al estudiante utilizando RegistroController.
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -62,22 +63,18 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
       contrasena: _contrasenaController.text,
     );
 
-    // La pantalla pudo haberse cerrado mientras Firebase respondía.
     if (!mounted) return;
 
     if (registro.registroExitoso) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cuenta registrada correctamente'),
-        ),
-      );
-
-      // SesionController se encarga de detectar
-      // la cuenta y cargar el perfil desde Firestore.
+      // Cerrar el formulario después del registro exitoso.
+      // AuthGate mostrará la pantalla según el rol del usuario.
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
-  // Validaciones visuales de los campos.
+  // Validaciones visuales de cada campo.
   String? _validarCampo(String etiqueta, String? valor) {
     final texto = valor?.trim() ?? '';
 
@@ -85,6 +82,7 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
       return 'Este campo es obligatorio';
     }
 
+    // Validar nombre completo.
     if (etiqueta == 'Nombre completo') {
       final palabras = texto.split(RegExp(r'\s+'));
 
@@ -98,14 +96,32 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
       ).hasMatch(texto)) {
         return 'El nombre solo debe contener letras';
       }
+
+      if (texto.length > 100) {
+        return 'El nombre no puede superar los 100 caracteres';
+      }
     }
 
+    // Validar cédula.
     if (etiqueta == 'Cédula') {
       if (!RegExp(r'^[0-9]+$').hasMatch(texto)) {
         return 'La cédula debe contener solo números';
       }
+
+      if (texto.length < 5 || texto.length > 20) {
+        return 'La cédula debe tener entre 5 y 20 dígitos';
+      }
     }
 
+    // Validar carnet.
+    if (etiqueta == 'Número de carnet') {
+      if (!RegExp(r'^[a-zA-Z0-9-]{4,24}$').hasMatch(texto)) {
+        return 'El carnet debe tener entre 4 y 24 caracteres '
+            'y solo puede contener letras, números o guiones';
+      }
+    }
+
+    // Validar correo institucional.
     if (etiqueta == 'Correo electrónico') {
       final correoValido = RegExp(
         r'^[A-Za-z0-9._%+-]+@(correo\.unimet\.edu\.ve|unimet\.edu\.ve)$',
@@ -117,19 +133,24 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
       }
     }
 
-    if (etiqueta == 'Contraseña' && valor!.length < 6) {
-      return 'Debe tener al menos 6 caracteres';
+    // Validar contraseña.
+    if (etiqueta == 'Contraseña') {
+      if (valor!.length < 6) {
+        return 'Debe tener al menos 6 caracteres';
+      }
     }
 
-    if (etiqueta == 'Confirmar contraseña' &&
-        valor != _contrasenaController.text) {
-      return 'Las contraseñas no coinciden';
+    // Validar confirmación de contraseña.
+    if (etiqueta == 'Confirmar contraseña') {
+      if (valor != _contrasenaController.text) {
+        return 'Las contraseñas no coinciden';
+      }
     }
 
     return null;
   }
 
-  // Campo reutilizable con estilos del tema global.
+  // Crear campos reutilizables con el tema global.
   Widget _campo(
     String etiqueta,
     TextEditingController controller, {
@@ -184,7 +205,9 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
                     style: Theme.of(context)
                         .textTheme
                         .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                        ?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
 
                   const SizedBox(height: 8),
@@ -196,11 +219,13 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
 
                   const SizedBox(height: 24),
 
+                  // Nombre completo.
                   _campo(
                     'Nombre completo',
                     _nombreController,
                   ),
 
+                  // Cédula.
                   _campo(
                     'Cédula',
                     _cedulaController,
@@ -210,29 +235,34 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
                     ],
                   ),
 
+                  // Número de carnet.
                   _campo(
                     'Número de carnet',
                     _carnetController,
                   ),
 
+                  // Correo institucional.
                   _campo(
                     'Correo electrónico',
                     _correoController,
                     tipoTeclado: TextInputType.emailAddress,
                   ),
 
+                  // Contraseña.
                   _campo(
                     'Contraseña',
                     _contrasenaController,
                     ocultar: true,
                   ),
 
+                  // Confirmar contraseña.
                   _campo(
                     'Confirmar contraseña',
                     _confirmarController,
                     ocultar: true,
                   ),
 
+                  // Mostrar los errores del controlador.
                   if (registro.error != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -246,8 +276,11 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
 
                   const SizedBox(height: 16),
 
+                  // Botón de registro.
                   ElevatedButton(
-                    onPressed: registro.cargando ? null : _registrar,
+                    onPressed: registro.cargando
+                        ? null
+                        : _registrar,
                     child: registro.cargando
                         ? const SizedBox(
                             height: 20,
