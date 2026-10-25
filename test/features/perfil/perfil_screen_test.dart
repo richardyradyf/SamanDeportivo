@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:saman_deportivo/core/theme/app_colors.dart';
+import 'package:saman_deportivo/core/theme/app_theme.dart';
 // Ajustar el nombre del paquete al `name:` real del pubspec.yaml de Richard.
 import 'package:saman_deportivo/features/perfil/domain/perfil_usuario.dart';
 import 'package:saman_deportivo/features/perfil/data/perfil_repository.dart';
@@ -28,18 +30,28 @@ class RepositorioFalso implements PerfilRepository {
 
 void main() {
   final perfil = PerfilUsuario.fromMap('uid-demo', {
-    'cedula': '12345678', 'nombre': 'Alexander Ramírez',
-    'correo': 'alexander@unimet.edu.ve', 'rol': 'estudiante',
-    'carnet': '202611111', 'estado': 'activo',
+    'cedula': '12345678',
+    'nombre': 'Alexander Ramírez',
+    'correo': 'alexander@unimet.edu.ve',
+    'rol': 'estudiante',
+    'carnet': '202611111',
+    'estado': 'activo',
   });
 
   testWidgets('muestra datos reales y no hardcodeados', (tester) async {
     final repo = RepositorioFalso(perfil);
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: PerfilScreen(
-        uid: 'uid-demo', repository: repo, cerrarSesion: () async {},
-      )),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.claro,
+        home: Scaffold(
+          body: PerfilScreen(
+            uid: 'uid-demo',
+            repository: repo,
+            cerrarSesion: () async {},
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Alexander Ramírez'), findsWidgets);
     expect(find.text('202611111'), findsOneWidget);
@@ -48,15 +60,25 @@ void main() {
 
   testWidgets('guardar edicion invoca repositorio', (tester) async {
     final repo = RepositorioFalso(perfil);
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: PerfilScreen(
-        uid: 'uid-demo', repository: repo, cerrarSesion: () async {},
-      )),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.claro,
+        home: Scaffold(
+          body: PerfilScreen(
+            uid: 'uid-demo',
+            repository: repo,
+            cerrarSesion: () async {},
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Editar perfil'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Nombre'), 'Nombre Actualizado');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nombre'),
+      'Nombre Actualizado',
+    );
     await tester.tap(find.text('Guardar cambios'));
     await tester.pumpAndSettle();
     expect(repo.nombreGuardado, 'Nombre Actualizado');
@@ -65,12 +87,20 @@ void main() {
 
   testWidgets('cerrar sesion exige confirmacion', (tester) async {
     var llamados = 0;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: PerfilScreen(
-        uid: 'uid-demo', repository: RepositorioFalso(perfil),
-        cerrarSesion: () async { llamados++; },
-      )),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.claro,
+        home: Scaffold(
+          body: PerfilScreen(
+            uid: 'uid-demo',
+            repository: RepositorioFalso(perfil),
+            cerrarSesion: () async {
+              llamados++;
+            },
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cerrar sesión').first);
     await tester.pumpAndSettle();
@@ -78,5 +108,36 @@ void main() {
     await tester.tap(find.text('Cerrar sesión').last);
     await tester.pumpAndSettle();
     expect(llamados, 1);
+  });
+  testWidgets('el perfil usa colores y tipografia del tema Figma', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.claro,
+        home: Scaffold(
+          body: PerfilScreen(
+            uid: 'uid-demo',
+            repository: RepositorioFalso(perfil),
+            cerrarSesion: () async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final etiquetaRol = tester.widget<Text>(find.text('Estudiante activo'));
+    expect(etiquetaRol.style?.color, AppColors.primario);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is ColoredBox && widget.color == AppColors.fondo,
+      ),
+      findsOneWidget,
+    );
+    final contexto = tester.element(find.text('Mi perfil'));
+    expect(
+      Theme.of(contexto).textTheme.headlineLarge?.fontFamily,
+      AppTheme.fuente,
+    );
   });
 }
