@@ -48,4 +48,17 @@ void main() {
 
     expect(fondo, AppColors.primario);
   });
+
+  test('NavigationRail usa el sidebar oscuro del Figma', () {
+    final barra = tema.navigationRailTheme;
+    expect(barra.backgroundColor, AppColors.primarioOscuro);
+    expect(barra.minExtendedWidth, 240);
+    expect(barra.indicatorColor, AppColors.sidebarSeleccion);
+    expect(barra.selectedIconTheme?.color, Colors.white);
+    expect(barra.unselectedIconTheme?.color, AppColors.sidebarTexto);
+    expect(barra.selectedLabelTextStyle?.color, Colors.white);
+    expect(barra.unselectedLabelTextStyle?.color, AppColors.sidebarTexto);
+    // Navegacion inferior de movil permanece clara.
+    expect(tema.navigationBarTheme.backgroundColor, AppColors.superficie);
+  });
 }
