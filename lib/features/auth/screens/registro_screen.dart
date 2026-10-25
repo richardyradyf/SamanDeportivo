@@ -1,17 +1,36 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
-class RegistroScreen extends StatefulWidget {
+import '../controllers/registro_controller.dart';
+
+// Pantalla principal de registro.
+class RegistroScreen extends StatelessWidget {
   const RegistroScreen({super.key});
 
   @override
-  State<RegistroScreen> createState() => _RegistroScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => RegistroController(),
+      child: const _FormularioRegistro(),
+    );
+  }
 }
 
-class _RegistroScreenState extends State<RegistroScreen> {
+// Formulario de registro de estudiantes.
+class _FormularioRegistro extends StatefulWidget {
+  const _FormularioRegistro();
+
+  @override
+  State<_FormularioRegistro> createState() =>
+      _FormularioRegistroState();
+}
+
+class _FormularioRegistroState extends State<_FormularioRegistro> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controladores de los campos del formulario.
+  // Controladores de los campos.
   final _nombreController = TextEditingController();
   final _cedulaController = TextEditingController();
   final _carnetController = TextEditingController();
@@ -30,53 +49,74 @@ class _RegistroScreenState extends State<RegistroScreen> {
     super.dispose();
   }
 
-  // Validar los datos ingresados.
+  // Validar el formulario utilizando RegistroController.
   void _validarRegistro() {
-    if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Formulario validado correctamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    final formularioValido =
+        _formKey.currentState!.validate();
+
+    if (!formularioValido) {
+      return;
     }
+
+    final controller = context.read<RegistroController>();
+
+    final error = controller.validarDatos(
+      nombre: _nombreController.text,
+      cedula: _cedulaController.text,
+      carnet: _carnetController.text,
+      correo: _correoController.text,
+      contrasena: _contrasenaController.text,
+    );
+
+    if (error != null) {
+      controller.mostrarError(error);
+      return;
+    }
+
+    controller.limpiarEstado();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Datos validados. Registro en Firebase pendiente.',
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
-  // Validaciones específicas de cada campo.
+  // Validaciones que se muestran debajo de cada campo.
   String? _validarCampo(String etiqueta, String? valor) {
     final texto = valor?.trim() ?? '';
 
-    // Verificar que el campo no esté vacío.
     if (texto.isEmpty) {
       return 'Este campo es obligatorio';
     }
 
-    // Nombre y apellido: mínimo dos palabras.
+    // Nombre y apellido.
     if (etiqueta == 'Nombre completo') {
       final palabras = texto.split(RegExp(r'\s+'));
 
-      if (palabras.length < 2) {
-        return 'Ingresa al menos un nombre y un apellido';
+      if (palabras.length < 2 ||
+          palabras.any((palabra) => palabra.length < 2)) {
+        return 'Ingresa un nombre y un apellido válidos';
       }
 
-      if (palabras.any((palabra) => palabra.length < 2)) {
-        return 'Cada palabra debe tener al menos 2 caracteres';
-      }
-
-      if (!RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$')
-          .hasMatch(texto)) {
+      if (!RegExp(
+        r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$',
+      ).hasMatch(texto)) {
         return 'El nombre solo debe contener letras';
       }
     }
 
-    // Cédula: únicamente números.
+    // Cédula numérica.
     if (etiqueta == 'Cédula') {
       if (!RegExp(r'^[0-9]+$').hasMatch(texto)) {
         return 'La cédula debe contener solo números';
       }
     }
 
-    // Correo institucional de la UNIMET.
+    // Correo institucional.
     if (etiqueta == 'Correo electrónico') {
       final correoValido = RegExp(
         r'^[A-Za-z0-9._%+-]+@(correo\.unimet\.edu\.ve|unimet\.edu\.ve)$',
@@ -88,14 +128,14 @@ class _RegistroScreenState extends State<RegistroScreen> {
       }
     }
 
-    // Contraseña: mínimo seis caracteres.
+    // Contraseña.
     if (etiqueta == 'Contraseña') {
       if (valor!.length < 6) {
-        return 'La contraseña debe tener al menos 6 caracteres';
+        return 'Debe tener al menos 6 caracteres';
       }
     }
 
-    // Confirmación de la contraseña.
+    // Confirmar contraseña.
     if (etiqueta == 'Confirmar contraseña') {
       if (valor != _contrasenaController.text) {
         return 'Las contraseñas no coinciden';
@@ -105,7 +145,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
     return null;
   }
 
-  // Crear campos reutilizables.
+  // Campo reutilizable del formulario.
   Widget _campo(
     String etiqueta,
     TextEditingController controller, {
@@ -137,6 +177,8 @@ class _RegistroScreenState extends State<RegistroScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final registro = context.watch<RegistroController>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Registro de estudiante'),
@@ -185,7 +227,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
                     _nombreController,
                   ),
 
-                  // Cédula: solo números.
+                  // Cédula.
                   _campo(
                     'Cédula',
                     _cedulaController,
@@ -215,23 +257,46 @@ class _RegistroScreenState extends State<RegistroScreen> {
                     ocultar: true,
                   ),
 
-                  // Confirmar contraseña.
+                  // Confirmación.
                   _campo(
                     'Confirmar contraseña',
                     _confirmarController,
                     ocultar: true,
                   ),
 
+                  // Mostrar errores del controlador.
+                  if (registro.error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      registro.error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 16),
 
                   ElevatedButton(
-                    onPressed: _validarRegistro,
+                    onPressed: registro.cargando
+                        ? null
+                        : _validarRegistro,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepOrange,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.all(16),
                     ),
-                    child: const Text('Registrarme'),
+                    child: registro.cargando
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Registrarme'),
                   ),
                 ],
               ),
