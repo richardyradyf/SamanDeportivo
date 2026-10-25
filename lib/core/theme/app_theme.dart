@@ -143,11 +143,30 @@ abstract final class AppTheme {
         backgroundColor: AppColors.superficie,
         indicatorColor: AppColors.suave,
       ),
+      // Figma: sidebar verde oscuro de 240 px en escritorio.
+      // La barra inferior movil y el NavigationDrawer conservan su tema claro.
       navigationRailTheme: const NavigationRailThemeData(
-        backgroundColor: AppColors.superficie,
-        indicatorColor: AppColors.suave,
-        selectedIconTheme: IconThemeData(color: AppColors.primario),
-        unselectedIconTheme: IconThemeData(color: AppColors.textoSecundario),
+        backgroundColor: AppColors.primarioOscuro,
+        minExtendedWidth: 240,
+        useIndicator: true,
+        indicatorColor: AppColors.sidebarSeleccion,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+        selectedIconTheme: IconThemeData(color: Colors.white),
+        unselectedIconTheme: IconThemeData(color: AppColors.sidebarTexto),
+        selectedLabelTextStyle: TextStyle(
+          fontFamily: fuente,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        unselectedLabelTextStyle: TextStyle(
+          fontFamily: fuente,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: AppColors.sidebarTexto,
+        ),
       ),
       navigationDrawerTheme: const NavigationDrawerThemeData(
         backgroundColor: AppColors.superficie,

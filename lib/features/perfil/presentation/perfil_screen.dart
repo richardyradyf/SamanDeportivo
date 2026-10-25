@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:saman_deportivo/core/theme/app_colors.dart';
+import 'package:saman_deportivo/core/theme/app_theme.dart';
 
 import '../data/firestore_perfil_repository.dart';
 import '../data/perfil_repository.dart';
@@ -27,12 +29,6 @@ class PerfilScreen extends StatefulWidget {
 
 class _PerfilScreenState extends State<PerfilScreen> {
   bool _procesando = false;
-
-  static const _fondo = Color(0xFFF6F9F7);
-  static const _primario = Color(0xFF06452B);
-  static const _texto = Color(0xFF0A140F);
-  static const _subtexto = Color(0xFF57635C);
-  static const _borde = Color(0xFFDBE3DE);
 
   Future<void> _editar(PerfilUsuario perfil) async {
     final nombre = TextEditingController(text: perfil.nombre);
@@ -177,7 +173,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           );
         }
         return ColoredBox(
-          color: _fondo,
+          color: AppColors.fondo,
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 34, 24, 64),
             child: Center(
@@ -188,13 +184,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   children: [
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        const titulo = Text(
+                        final titulo = Text(
                           'Mi perfil',
-                          style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w700,
-                            color: _texto,
-                          ),
+                          style: Theme.of(context).textTheme.headlineLarge
+                              ?.copyWith(
+                                fontSize:
+                                    34, // Tamano exacto en Figma, pantalla 13.
+                                fontWeight: FontWeight.w700,
+                              ),
                         );
                         // Con anchos intermedios, poner el titulo y los botones
                         // en la misma fila provoca un RenderFlex overflow.
@@ -228,14 +225,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
                       children: [
                         CircleAvatar(
                           radius: 42,
-                          backgroundColor: const Color(0xFFE3F2E8),
+                          backgroundColor: AppColors.suave,
                           child: Text(
                             perfil.iniciales,
-                            style: const TextStyle(
-                              color: _primario,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: AppColors.primario,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                         ),
                         const SizedBox(width: 24),
@@ -245,21 +242,19 @@ class _PerfilScreenState extends State<PerfilScreen> {
                             children: [
                               Text(
                                 perfil.nombre,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 5),
                               Text(
                                 perfil.rol == RolPerfil.estudiante
                                     ? 'Estudiante ${perfil.estado ?? 'sin validar'}'
                                     : perfil.nombreRol,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: _primario,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: AppColors.primario,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
                             ],
                           ),
@@ -317,7 +312,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           icon: const Icon(Icons.edit_outlined, size: 18),
           label: const Text('Editar perfil'),
         ),
-        FilledButton.tonalIcon(
+        TextButton.icon(
           onPressed: _procesando ? null : _salir,
           icon: const Icon(Icons.logout, size: 18),
           label: const Text('Cerrar sesión'),
@@ -331,21 +326,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _borde),
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.superficie,
+        border: Border.all(color: AppColors.borde),
+        borderRadius: BorderRadius.circular(AppTheme.radioTarjeta),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            titulo,
-            style: const TextStyle(
-              color: _subtexto,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(titulo, style: Theme.of(context).textTheme.labelMedium),
           const SizedBox(height: 32),
           LayoutBuilder(
             builder: (context, constraints) => Wrap(
@@ -362,20 +350,13 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         children: [
                           Text(
                             dato.etiqueta,
-                            style: const TextStyle(
-                              color: _subtexto,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: Theme.of(context).textTheme.labelMedium,
                           ),
                           const SizedBox(height: 12),
                           SelectableText(
                             dato.valor,
-                            style: const TextStyle(
-                              color: _texto,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
