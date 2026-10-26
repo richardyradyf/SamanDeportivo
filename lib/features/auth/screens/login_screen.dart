@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:saman_deportivo/core/theme/app_colors.dart';
 import 'package:saman_deportivo/core/utils/validadores.dart';
 import 'package:saman_deportivo/features/auth/controllers/login_controller.dart';
+import 'package:saman_deportivo/features/auth/screens/recuperar_contrasena_screen.dart';
 import 'package:saman_deportivo/features/auth/screens/registro_screen.dart';
 
 /// Pantalla de inicio de sesión (la ven quienes no tienen sesión).
@@ -140,6 +141,17 @@ class _FormularioLoginState extends State<_FormularioLogin> {
     );
   }
 
+  /// Abre la recuperación de contraseña llevando el correo ya escrito.
+  void _irARecuperar() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RecuperarContrasenaScreen(
+          correoInicial: _correoController.text.trim(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final login = context.watch<LoginController>();
@@ -202,6 +214,14 @@ class _FormularioLoginState extends State<_FormularioLogin> {
             validator: Validadores.contrasenaLogin,
             onChanged: (_) => login.limpiarError(),
             onFieldSubmitted: (_) => _entrar(),
+          ),
+          // Enlace a la recuperación de contraseña.
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: login.cargando ? null : _irARecuperar,
+              child: const Text('¿Olvidaste tu contraseña?'),
+            ),
           ),
           // Error de Firebase ya traducido al español.
           if (login.error != null) ...[
