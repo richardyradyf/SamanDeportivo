@@ -10,8 +10,10 @@ import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/persona.dart';
 
 /// Construye la pestaña "Perfil" para la persona en sesión.
-typedef ConstructorPerfil =
-    Widget Function(Persona persona, SesionController sesion);
+typedef ConstructorPerfil = Widget Function(
+  Persona persona,
+  SesionController sesion,
+);
 
 /// Puerta de entrada de la app: escucha al [SesionController] y decide
 /// qué pantalla mostrar según el estado de la sesión y el rol.
@@ -87,6 +89,7 @@ class AuthGate extends StatelessWidget {
         key: llave,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
+        perfil: construirPerfil(persona, sesion),
       ),
     };
   }

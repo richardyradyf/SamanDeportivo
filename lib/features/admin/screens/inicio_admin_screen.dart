@@ -8,7 +8,7 @@ import 'package:saman_deportivo/models/enums.dart';
 
 /// Pantalla de inicio del administrador, según el Figma: Dashboard,
 /// Deportes, Entrenadores, Horarios, Inscripciones, Analítica y
-/// Configuración (el Figma no le da sección de Perfil).
+/// Configuración (el perfil se abre allí, sin añadir un octavo destino).
 ///
 /// Son 7 secciones: en el móvil el menú es desplegable (ver
 /// [LayoutResponsivo]).
@@ -17,10 +17,15 @@ class InicioAdminScreen extends StatelessWidget {
     super.key,
     required this.nombre,
     required this.onCerrarSesion,
+    this.perfil,
   });
 
   final String nombre;
   final VoidCallback onCerrarSesion;
+
+  /// Perfil del administrador, integrado dentro de Configuración.
+  /// Si se omite, mantenemos el placeholder usado por pruebas existentes.
+  final Widget? perfil;
 
   @override
   Widget build(BuildContext context) {
@@ -84,14 +89,16 @@ class InicioAdminScreen extends StatelessWidget {
             icono: Icons.bar_chart,
           ),
         ),
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Configuración',
           icono: Icons.settings_outlined,
           iconoSeleccionado: Icons.settings,
-          pantalla: SeccionPendiente(
-            titulo: 'Configuración',
-            icono: Icons.settings,
-          ),
+          pantalla:
+              perfil ??
+              const SeccionPendiente(
+                titulo: 'Configuración',
+                icono: Icons.settings,
+              ),
         ),
       ],
     );
