@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:saman_deportivo/features/admin/screens/inicio_admin_screen.dart';
 
-Future<void> _mostrar(WidgetTester tester, double ancho) async {
+Future<void> _mostrar(
+  WidgetTester tester,
+  double ancho, {
+  Widget? perfil,
+}) async {
   tester.view.physicalSize = Size(ancho, 800);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
-      home: InicioAdminScreen(nombre: 'Ana Pérez', onCerrarSesion: () {}),
+      home: InicioAdminScreen(
+        nombre: 'Ana Pérez',
+        onCerrarSesion: () {},
+        perfil: perfil,
+      ),
     ),
   );
 }
@@ -45,6 +53,17 @@ void main() {
       find.descendant(of: menu, matching: find.text('Perfil')),
       findsNothing,
     );
+  });
+
+  testWidgets('Configuración muestra perfil real cuando se inyecta', (
+    tester,
+  ) async {
+    await _mostrar(tester, 1280, perfil: const Text('Perfil admin de prueba'));
+    await tester.tap(find.text('Configuración'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Perfil admin de prueba'), findsOneWidget);
+    expect(find.byType(NavigationRail), findsOneWidget);
   });
 
   testWidgets('en móvil usa el menú desplegable porque son 7 secciones', (

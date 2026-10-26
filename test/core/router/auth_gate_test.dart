@@ -139,6 +139,21 @@ void main() {
     expect(find.byType(InicioAdminScreen), findsOneWidget);
   });
 
+  testWidgets('AuthGate inyecta perfil en administrador', (tester) async {
+    await _mostrar(
+      tester,
+      SesionFalsa(
+        EstadoSesion.autenticado,
+        personaActual: _persona(Rol.administrador),
+      ),
+    );
+    final pantalla = tester.widget<InicioAdminScreen>(
+      find.byType(InicioAdminScreen),
+    );
+    expect(pantalla.perfil, isA<Text>());
+    expect((pantalla.perfil! as Text).data, 'Perfil de Ana Ruiz');
+  });
+
   testWidgets('autenticado sin persona sigue cargando', (tester) async {
     await _mostrar(tester, SesionFalsa(EstadoSesion.autenticado));
 
