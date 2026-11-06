@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:saman_deportivo/features/estudiante/inscripciones/screens/mis_inscripciones_screen.dart';
 import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
@@ -82,11 +82,9 @@ class InicioEstudianteScreen extends StatelessWidget {
           etiqueta: 'Inscripciones',
           icono: Icons.assignment_outlined,
           iconoSeleccionado: Icons.assignment,
-          pantalla: SeccionPendiente(
-            titulo: 'Inscripciones',
-            icono: Icons.assignment,
-          ),
+          pantalla: MisInscripcionesScreen(),
         ),
+
         DestinoNavegacion(
           etiqueta: 'Perfil',
           icono: Icons.person_outline,
