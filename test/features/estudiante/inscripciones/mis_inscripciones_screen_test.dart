@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,34 +22,21 @@ void main() {
     );
   }
 
-  testWidgets('Muestra mensaje cuando no hay inscripciones', (
-    tester,
-  ) async {
+  testWidgets('Muestra mensaje cuando no hay inscripciones', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: MisInscripcionesScreen(),
-        ),
-      ),
+      const MaterialApp(home: Scaffold(body: MisInscripcionesScreen())),
     );
 
-    expect(
-      find.text('No tienes inscripciones registradas'),
-      findsOneWidget,
-    );
+    expect(find.text('No tienes inscripciones registradas'), findsOneWidget);
   });
 
-  testWidgets('Muestra los datos de una inscripción', (
-    tester,
-  ) async {
+  testWidgets('Muestra los datos de una inscripción', (tester) async {
     final inscripcion = crearInscripcion();
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: MisInscripcionesScreen(
-            inscripciones: [inscripcion],
-          ),
+          body: MisInscripcionesScreen(inscripciones: [inscripcion]),
         ),
       ),
     );
@@ -58,24 +44,16 @@ void main() {
     expect(find.text('Tenis'), findsOneWidget);
     expect(find.text('Código: TEN-01'), findsOneWidget);
     expect(find.text('Pendiente'), findsOneWidget);
-    expect(
-      find.text('Fecha límite de pago: 07/11/2026'),
-      findsOneWidget,
-    );
+    expect(find.text('Fecha límite de pago: 07/11/2026'), findsOneWidget);
 
     final boton = tester.widget<OutlinedButton>(
-      find.widgetWithText(
-        OutlinedButton,
-        'Cancelar inscripción',
-      ),
+      find.widgetWithText(OutlinedButton, 'Cancelar inscripción'),
     );
 
     expect(boton.onPressed, isNull);
   });
 
-  testWidgets('Permite solicitar una cancelación', (
-    tester,
-  ) async {
+  testWidgets('Permite solicitar una cancelación', (tester) async {
     final inscripcion = crearInscripcion();
     var cancelacionSolicitada = false;
 
@@ -97,9 +75,7 @@ void main() {
     expect(cancelacionSolicitada, true);
   });
 
-  testWidgets('Muestra las inscripciones desde un Stream', (
-    tester,
-  ) async {
+  testWidgets('Muestra las inscripciones desde un Stream', (tester) async {
     final inscripcion = crearInscripcion();
 
     await tester.pumpWidget(
@@ -118,9 +94,7 @@ void main() {
     expect(find.text('Pendiente'), findsOneWidget);
   });
 
-  testWidgets('No permite cancelar una inscripción cancelada', (
-    tester,
-  ) async {
+  testWidgets('No permite cancelar una inscripción cancelada', (tester) async {
     final inscripcion = crearInscripcion().conEstado(
       EstadoInscripcion.cancelada,
       responsableUid: 'EST001',
