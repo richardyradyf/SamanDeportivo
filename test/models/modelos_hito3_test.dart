@@ -57,6 +57,26 @@ void main() {
       expect(tenis.copyWith(cuposOcupados: 2).tieneCupo, isFalse);
     });
 
+    test('sinEntrenador quita el entrenador y conserva lo demás', () {
+      final conEntrenador = deportesDePrueba().first.copyWith(
+        entrenadorUid: 'ent1', entrenadorNombre: 'Carlos', entrenadorEspecialidad: 'Fútbol');
+      final sinEntrenador = conEntrenador.sinEntrenador();
+
+      expect(sinEntrenador.tieneEntrenador, isFalse);
+      expect(sinEntrenador.entrenadorNombre, isNull);
+      expect(sinEntrenador.toMap()['entrenadorUid'], isNull);
+      expect(sinEntrenador.cupoMaximo, conEntrenador.cupoMaximo);
+    });
+
+    test('guarda y lee la fecha de actualización', () {
+      final editado = deportesDePrueba().first
+          .copyWith(actualizadoEn: DateTime(2026, 11, 6, 9));
+      final copia = Deporte.fromMap(editado.codigo, editado.toMap());
+
+      expect(copia.actualizadoEn, DateTime(2026, 11, 6, 9));
+      expect(deportesDePrueba().first.actualizadoEn, isNull);
+    });
+
     test('los códigos de prueba tienen el formato correcto', () {
       for (final deporte in deportesDePrueba()) {
         expect(Deporte.formatoCodigo.hasMatch(deporte.codigo), isTrue);
@@ -103,6 +123,48 @@ void main() {
 
       final copia = Inscripcion.fromMap(cancelada.id, cancelada.toMap());
       expect(copia.historial.length, 2);
+    });
+  });
+
+  group('Reinscripción', () {
+    final deporte = deportesDePrueba().first;
+    final ahora = DateTime(2026, 11, 5, 10);
+
+    test('después de cancelar reutiliza el ID y conserva el historial', () {
+      final cancelada = Inscripcion.nueva(
+              estudiante: estudiante, deporte: deporte, ahora: ahora)
+          .conEstado(EstadoInscripcion.cancelada, responsableUid: 'est1');
+      final otraVez = cancelada.reinscribir(
+        estudiante: estudiante, deporte: deporte, ahora: DateTime(2026, 11, 7, 8));
+
+      expect(otraVez.id, cancelada.id);
+      expect(otraVez.estado, EstadoInscripcion.pendiente);
+      expect(otraVez.motivo, isNull);
+      expect(otraVez.pagoId, isNull);
+      expect(otraVez.fechaLimitePago, DateTime(2026, 11, 8, 8));
+      expect(otraVez.historial.map((c) => c.estado), [
+        EstadoInscripcion.pendiente,
+        EstadoInscripcion.cancelada,
+        EstadoInscripcion.pendiente,
+      ]);
+    });
+
+    test('se permite después de expirar o ser rechazada', () {
+      final base = Inscripcion.nueva(estudiante: estudiante, deporte: deporte, ahora: ahora);
+      for (final estado in [EstadoInscripcion.expirada, EstadoInscripcion.rechazada]) {
+        final anterior = base.conEstado(estado, responsableUid: 'sistema', motivo: 'x');
+        expect(anterior.permiteReinscripcion, isTrue);
+      }
+    });
+
+    test('no se permite mientras retiene el cupo', () {
+      final pendiente = Inscripcion.nueva(estudiante: estudiante, deporte: deporte, ahora: ahora);
+      final confirmada = pendiente.conEstado(
+        EstadoInscripcion.confirmada, responsableUid: 'est1', pagoId: 'p1');
+
+      expect(pendiente.permiteReinscripcion, isFalse);
+      expect(() => confirmada.reinscribir(estudiante: estudiante, deporte: deporte),
+          throwsStateError);
     });
   });
 

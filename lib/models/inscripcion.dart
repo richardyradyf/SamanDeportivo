@@ -117,6 +117,43 @@ class Inscripcion {
 
   bool get ocupaCupo => estado.ocupaCupo;
 
+  /// Se puede volver a inscribir si la anterior fue cancelada, expirada
+  /// o rechazada (no retiene cupo).
+  bool get permiteReinscripcion => !ocupaCupo;
+
+  /// Reinscripción: reutiliza el mismo documento (mismo ID) en estado
+  /// pendiente, con fechas nuevas, sin pago ni motivo anteriores,
+  /// y conserva el historial anterior (RF-08).
+  Inscripcion reinscribir({
+    required Estudiante estudiante,
+    required Deporte deporte,
+    DateTime? ahora,
+  }) {
+    if (!permiteReinscripcion) {
+      throw StateError('La inscripción $id todavía retiene el cupo');
+    }
+    final nueva = Inscripcion.nueva(
+      estudiante: estudiante,
+      deporte: deporte,
+      ahora: ahora,
+    );
+    return Inscripcion(
+      id: nueva.id,
+      estudianteUid: nueva.estudianteUid,
+      estudianteCedula: nueva.estudianteCedula,
+      estudianteNombre: nueva.estudianteNombre,
+      estudianteCarnet: nueva.estudianteCarnet,
+      estudianteCorreo: nueva.estudianteCorreo,
+      deporteId: nueva.deporteId,
+      deporteNombre: nueva.deporteNombre,
+      entrenadorUid: nueva.entrenadorUid,
+      estado: nueva.estado,
+      fechaInscripcion: nueva.fechaInscripcion,
+      fechaLimitePago: nueva.fechaLimitePago,
+      historial: [...historial, ...nueva.historial],
+    );
+  }
+
   /// Pendiente y fuera de plazo: hay que pasarla a expirada.
   bool estaVencida([DateTime? ahora]) =>
       estado == EstadoInscripcion.pendiente &&

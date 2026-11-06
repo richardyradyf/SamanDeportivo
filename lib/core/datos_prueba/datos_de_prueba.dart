@@ -1,16 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../../models/deporte.dart';
 import '../../models/entrenador.dart';
 import '../../models/enums.dart';
 import '../../models/horario_sesion.dart';
-import '../../models/persona.dart';
 
-/// Datos de prueba del Hito 3.
+/// Datos de prueba del Hito 3, en memoria, para armar pantallas y pruebas
+/// sin conectarse a Firebase.
 ///
-/// - [deportesDePrueba] sirve para armar pantallas sin conectarse a Firebase.
-/// - [subirDatosDePrueba] carga esos deportes en Firestore. Se ejecuta UNA vez,
-///   con sesión de administrador, porque reinicia los cupos a 0.
+/// Para tenerlos en Firestore se usa SOLO el emulador:
+/// `npm run emulador` y `npm run emulador:datos`
+/// (script `scripts/cargar_datos_emulador.mjs`, con los mismos deportes).
 ///
 /// TEN-01 tiene cupo 2 para probar "sin cupos".
 List<Deporte> deportesDePrueba({List<Entrenador> entrenadores = const []}) {
@@ -94,24 +92,4 @@ List<Deporte> deportesDePrueba({List<Entrenador> entrenadores = const []}) {
         entrenadorEspecialidad: entrenadores[i % entrenadores.length].especialidad,
       ),
   ];
-}
-
-/// Sube los deportes de prueba a Firestore y les asigna los entrenadores
-/// que existan en `usuarios`. Requiere sesión de administrador.
-Future<void> subirDatosDePrueba(FirebaseFirestore db) async {
-  final consulta = await db
-      .collection('usuarios')
-      .where('rol', isEqualTo: Rol.entrenador.name)
-      .get();
-
-  final entrenadores = consulta.docs
-      .map((doc) => Persona.fromMap(doc.id, doc.data()))
-      .whereType<Entrenador>()
-      .toList();
-
-  final lote = db.batch();
-  for (final deporte in deportesDePrueba(entrenadores: entrenadores)) {
-    lote.set(db.collection('deportes').doc(deporte.codigo), deporte.toMap());
-  }
-  await lote.commit();
 }

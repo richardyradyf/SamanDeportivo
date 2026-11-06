@@ -24,8 +24,22 @@ class InscripcionException implements Exception {
 ///
 /// Todo cambio que toque cupos se hace en una transacción de Firestore
 /// junto con `deportes/{codigo}.cuposOcupados` / `cuposConfirmados`.
+///
+/// Reinscripción: el ID es siempre `{uid}_{codigo}`, así que volver a
+/// inscribirse reutiliza el mismo documento con [Inscripcion.reinscribir].
+/// Se permite si la anterior está cancelada, expirada o rechazada; el
+/// historial se conserva.
+///
+/// Expiración: no hay Cloud Functions (plan gratuito), así que las pendientes
+/// vencidas se expiran desde la app con [expirarVencidas] y, además, dentro de
+/// [inscribirse] si la inscripción leída ya venció. Limitación conocida: los
+/// cupos de una reserva vencida se liberan la próxima vez que alguien abre
+/// la app, no en el segundo exacto en que vence.
 abstract class InscripcionRepository {
   /// Reserva el cupo y deja la inscripción en `pendiente` (RF-07).
+  /// Si existe una anterior que no retiene cupo, la reutiliza (reinscripción);
+  /// si existe una pendiente vencida, la expira en la misma transacción
+  /// y luego reinscribe.
   /// Si el estudiante está inactivo, queda `rechazada` (RF-10).
   /// Lanza [InscripcionException] si ya está inscrito, no hay cupos
   /// o el deporte está inactivo.
@@ -45,7 +59,10 @@ abstract class InscripcionRepository {
   Future<void> expirar(String inscripcionId, {required String motivo});
 
   /// Expira las pendientes vencidas. Devuelve cuántas expiró.
-  /// Se llama al abrir "Mis inscripciones", el catálogo o la nómina.
+  /// Consulta `estado == pendiente` y `fechaLimitePago < ahora` (requiere un
+  /// índice compuesto) y expira cada una en su propia transacción, verificando
+  /// que siga pendiente. Se llama al iniciar sesión y al abrir el catálogo,
+  /// "Mis inscripciones", la nómina y el panel del administrador.
   Future<int> expirarVencidas();
 
   /// "Mis inscripciones" del estudiante.

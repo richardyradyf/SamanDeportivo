@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
+import 'core/config/entorno.dart';
 import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
 import 'features/auth/controllers/sesion_controller.dart';
@@ -13,6 +14,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Solo con --dart-define=USAR_EMULADOR=true (ver core/config/entorno.dart).
+  await conectarEmuladorSiCorresponde();
 
   runApp(
     // MultiProvider: aquí se registran TODOS los controllers globales.

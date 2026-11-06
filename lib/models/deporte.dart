@@ -34,6 +34,9 @@ class Deporte {
   final int totalResenas;
   final DateTime creadoEn;
 
+  /// Última modificación hecha por el administrador; null si nunca se editó.
+  final DateTime? actualizadoEn;
+
   const Deporte({
     required this.codigo,
     required this.nombre,
@@ -52,6 +55,7 @@ class Deporte {
     this.activo = true,
     this.promedioCalificacion = 0,
     this.totalResenas = 0,
+    this.actualizadoEn,
   });
 
   /// Formato del código: tres letras, guion y dos números (FUT-01).
@@ -88,6 +92,8 @@ class Deporte {
       'promedioCalificacion': promedioCalificacion,
       'totalResenas': totalResenas,
       'creadoEn': Timestamp.fromDate(creadoEn),
+      'actualizadoEn':
+          actualizadoEn == null ? null : Timestamp.fromDate(actualizadoEn!),
     };
   }
 
@@ -114,10 +120,13 @@ class Deporte {
       promedioCalificacion: leerDecimal(datos['promedioCalificacion']),
       totalResenas: leerEntero(datos['totalResenas']),
       creadoEn: leerFecha(datos['creadoEn']),
+      actualizadoEn: leerFechaOpcional(datos['actualizadoEn']),
     );
   }
 
   /// Copia cambiando solo los campos indicados. El código no se edita.
+  /// Pasar null deja el valor actual; para quitar el entrenador usar
+  /// [sinEntrenador].
   Deporte copyWith({
     String? nombre,
     String? descripcion,
@@ -134,6 +143,7 @@ class Deporte {
     bool? activo,
     double? promedioCalificacion,
     int? totalResenas,
+    DateTime? actualizadoEn,
   }) {
     return Deporte(
       codigo: codigo,
@@ -154,6 +164,28 @@ class Deporte {
       promedioCalificacion: promedioCalificacion ?? this.promedioCalificacion,
       totalResenas: totalResenas ?? this.totalResenas,
       creadoEn: creadoEn,
+      actualizadoEn: actualizadoEn ?? this.actualizadoEn,
+    );
+  }
+
+  /// Copia sin entrenador asignado (el administrador lo desasigna).
+  Deporte sinEntrenador({DateTime? actualizadoEn}) {
+    return Deporte(
+      codigo: codigo,
+      nombre: nombre,
+      descripcion: descripcion,
+      disciplina: disciplina,
+      costo: costo,
+      imagenUrl: imagenUrl,
+      cupoMaximo: cupoMaximo,
+      cuposOcupados: cuposOcupados,
+      cuposConfirmados: cuposConfirmados,
+      horarios: horarios,
+      activo: activo,
+      promedioCalificacion: promedioCalificacion,
+      totalResenas: totalResenas,
+      creadoEn: creadoEn,
+      actualizadoEn: actualizadoEn ?? this.actualizadoEn,
     );
   }
 }
