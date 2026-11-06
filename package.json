@@ -3,11 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:rules": "firebase emulators:exec --config firebase.security.test.json --project demo-saman-perfil --only firestore \"node --test test/firestore/firestore.rules.test.mjs\""
+    "test:rules": "firebase emulators:exec --config firebase.security.test.json --project demo-saman-perfil --only firestore \"node --test test/firestore/firestore.rules.test.mjs\"",
+    "emulador": "firebase emulators:start --only auth,firestore",
+    "emulador:datos": "node scripts/cargar_datos_emulador.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
-    "firebase": "^13.1.0"
+    "firebase": "^13.1.0",
+    "firebase-admin": "^13.0.0"
   },
   "overrides": {
     "@grpc/grpc-js": "1.14.6"
