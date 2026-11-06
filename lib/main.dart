@@ -49,6 +49,7 @@ class SamanDeportivoApp extends StatelessWidget {
         sinSesion: const LoginScreen(),
         obtenerInscripciones:
             FirestoreInscripcionRepository().observarDeEstudiante,
+        cancelarInscripcion: FirestoreInscripcionRepository().cancelar,
       ),
     );
   }
