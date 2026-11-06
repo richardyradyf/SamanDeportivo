@@ -13,10 +13,16 @@ import 'package:saman_deportivo/repositories/deporte_repository.dart';
 /// Antes de fusionar A1 se prueba con repositorios fake. Tras el merge de
 /// A1 se inyecta FirestoreDeporteRepository desde InicioAdminScreen.
 class HorariosAdminScreen extends StatefulWidget {
-  const HorariosAdminScreen({super.key, this.deportes, this.entrenadores});
+  const HorariosAdminScreen({
+    super.key,
+    this.deportes,
+    this.entrenadores,
+    this.agendaGateway,
+  });
 
   final DeporteRepository? deportes;
   final EntrenadorRepository? entrenadores;
+  final AgendaMutaciones? agendaGateway;
 
   @override
   State<HorariosAdminScreen> createState() => _HorariosAdminScreenState();
@@ -35,7 +41,10 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
     _entrenadores = widget.entrenadores?.observarEntrenadores();
     _gestion = widget.deportes == null
         ? null
-        : GestionAgendaEntrenador(widget.deportes!);
+        : GestionAgendaEntrenador(
+            widget.deportes!,
+            mutaciones: widget.agendaGateway,
+          );
     _busqueda.addListener(_refrescar);
   }
 

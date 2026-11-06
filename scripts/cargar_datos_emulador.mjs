@@ -78,8 +78,10 @@ async function crearUsuario({ uid, correo, datos }) {
     await auth.updateUser(uid, { email: correo, password: CONTRASENA, displayName: datos.nombre });
   }
   await db.doc(`usuarios/${uid}`).set({ ...datos, correo });
-  if (datos.rol === 'estudiante') {
+  if (datos.rol === 'estudiante' || datos.rol === 'entrenador') {
     await db.doc(`cedulas/${datos.cedula}`).set({ uid });
+  }
+  if (datos.rol === 'estudiante') {
     await db.doc(`carnets/${datos.carnet}`).set({ uid });
   }
 }

@@ -13,6 +13,15 @@ class AgendaEntrenadorException implements Exception {
   String toString() => mensaje;
 }
 
+/// Puerta segura hacia una callable. Los fakes conservan las pruebas unitarias.
+abstract class AgendaMutaciones {
+  Future<void> guardarAgenda({
+    required Deporte deporte,
+    required String? entrenadorUid,
+    required List<HorarioSesion> horarios,
+  });
+}
+
 /// Validaciones puras, independientes de Firestore y fáciles de probar.
 abstract final class ValidacionesAgendaEntrenador {
   static final RegExp _formatoHora = RegExp(
@@ -82,9 +91,17 @@ abstract final class ValidacionesAgendaEntrenador {
 /// La garantía definitiva debe implementarse con bloqueo/agenda transaccional
 /// del lado del servidor antes de considerar RF-16 completamente cerrado.
 class GestionAgendaEntrenador {
-  GestionAgendaEntrenador(this._deportes);
+  factory GestionAgendaEntrenador(
+    DeporteRepository deportes, {
+    AgendaMutaciones? mutaciones,
+  }) {
+    return GestionAgendaEntrenador._(deportes, mutaciones);
+  }
+
+  GestionAgendaEntrenador._(this._deportes, this._mutaciones);
 
   final DeporteRepository _deportes;
+  final AgendaMutaciones? _mutaciones;
 
   Future<List<Deporte>> _consultarTodos() async {
     return _deportes.observarCatalogo(soloActivos: false).first;
@@ -112,6 +129,14 @@ class GestionAgendaEntrenador {
       horarios: horarios,
       deportes: todos,
     );
+    if (_mutaciones != null) {
+      await _mutaciones.guardarAgenda(
+        deporte: actual,
+        entrenadorUid: entrenador.uid,
+        horarios: horarios,
+      );
+      return;
+    }
     await _deportes.actualizar(
       actual.copyWith(
         entrenadorUid: entrenador.uid,
@@ -126,6 +151,14 @@ class GestionAgendaEntrenador {
   Future<void> desasignar(String codigoDeporte) async {
     final todos = await _consultarTodos();
     final actual = _deportePorCodigo(todos, codigoDeporte);
+    if (_mutaciones != null) {
+      await _mutaciones.guardarAgenda(
+        deporte: actual,
+        entrenadorUid: null,
+        horarios: actual.horarios,
+      );
+      return;
+    }
     await _deportes.actualizar(actual.sinEntrenador());
   }
 
@@ -146,6 +179,14 @@ class GestionAgendaEntrenador {
         horarios: horarios,
         deportes: todos,
       );
+    }
+    if (_mutaciones != null) {
+      await _mutaciones.guardarAgenda(
+        deporte: actual,
+        entrenadorUid: uid,
+        horarios: horarios,
+      );
+      return;
     }
     await _deportes.actualizar(actual.copyWith(horarios: horarios));
   }

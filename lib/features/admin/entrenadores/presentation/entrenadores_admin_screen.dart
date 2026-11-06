@@ -1,5 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:saman_deportivo/features/admin/entrenadores/data/firebase_entrenador_provisioner.dart';
+
+import 'crear_entrenador_dialog.dart';
+
 import 'package:saman_deportivo/core/utils/busqueda_normalizada.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/data/entrenador_repository.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/data/firestore_entrenador_repository.dart';
@@ -60,6 +64,23 @@ class _EntrenadoresAdminScreenState extends State<EntrenadoresAdminScreen> {
             'Consulta las cuentas existentes y su especialidad.',
             style: tema.textTheme.bodySmall,
           ),
+          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          if (Firebase.apps.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                key: const Key('nuevo-entrenador'),
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => CrearEntrenadorDialog(
+                    crear: FirebaseEntrenadorProvisioner().crear,
+                  ),
+                ),
+                icon: const Icon(Icons.person_add_alt_1),
+                label: const Text('Nuevo entrenador'),
+              ),
+            ),
           const SizedBox(height: 16),
           TextField(
             key: const Key('buscar-entrenador'),
