@@ -159,6 +159,25 @@ service cloud.firestore {
       }
     }
 
+    // A3.5 — lecturas administrativas de operaciones (solo lectura)
+    // Estos datos pueden incluir datos personales o comerciales.
+    // Solo el administrador puede consultar documentos o colecciones.
+    // Las escrituras se integran exclusivamente con los módulos responsables.
+    match /inscripciones/{inscripcionId} {
+      allow get, list: if esAdministrador();
+      allow create, update, delete: if false;
+    }
+
+    match /pagos/{pagoId} {
+      allow get, list: if esAdministrador();
+      allow create, update, delete: if false;
+    }
+
+    match /busquedas/{busquedaId} {
+      allow get, list: if esAdministrador();
+      allow create, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

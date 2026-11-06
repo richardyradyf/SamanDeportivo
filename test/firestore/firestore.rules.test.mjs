@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 let env;
 const datosA = {
@@ -359,3 +359,69 @@ test('A3.2: administrador no puede crear reseñas', async () => {
     comentario: 'Reseña fraudulenta', oculta: false, fecha: new Date(),
   }));
 });
+
+// A3.5 — PRUEBAS DE LECTURA ADMINISTRATIVA DE FUENTES OPERATIVAS
+// Requiere los helpers existentes env, admin(), estudiante() y prepararEntrenador().
+// No introduce permisos de escritura para ningún rol.
+const fuentesA35 = ['inscripciones', 'pagos', 'busquedas'];
+
+async function sembrarFuenteA35(nombre) {
+  const id = `a35_seguridad_${nombre}`;
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), nombre, id), {
+      origen: 'prueba-reglas-a35',
+      fecha: new Date('2026-11-06T15:00:00Z'),
+    });
+  });
+  return id;
+}
+
+for (const nombre of fuentesA35) {
+  test(`A3.5: administrador puede leer un documento de ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertSucceeds(getDoc(doc(admin(), nombre, id)));
+  });
+
+  test(`A3.5: administrador puede listar ${nombre}`, async () => {
+    await sembrarFuenteA35(nombre);
+    await assertSucceeds(getDocs(collection(admin(), nombre)));
+  });
+
+  test(`A3.5: estudiante NO puede leer un documento de ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertFails(getDoc(doc(estudiante(), nombre, id)));
+  });
+
+  test(`A3.5: estudiante NO puede listar ${nombre}`, async () => {
+    await assertFails(getDocs(collection(estudiante(), nombre)));
+  });
+
+  test(`A3.5: entrenador NO puede listar ${nombre}`, async () => {
+    const coach = await prepararEntrenador(`a35-coach-${nombre}`);
+    await assertFails(getDocs(collection(coach, nombre)));
+  });
+
+  test(`A3.5: visitante NO puede leer ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    const anon = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anon, nombre, id)));
+  });
+
+  test(`A3.5: administrador NO puede crear ${nombre}`, async () => {
+    await assertFails(setDoc(doc(admin(), nombre, `a35_creacion_${nombre}`), {
+      origen: 'no-autorizado',
+    }));
+  });
+
+  test(`A3.5: administrador NO puede modificar ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertFails(updateDoc(doc(admin(), nombre, id), {
+      origen: 'modificado',
+    }));
+  });
+
+  test(`A3.5: administrador NO puede borrar ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertFails(deleteDoc(doc(admin(), nombre, id)));
+  });
+}

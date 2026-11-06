@@ -67,6 +67,10 @@ class _PanelIndicadoresOperativosState
           'Fuentes independientes. Una consulta sin permiso no equivale a cero registros.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        const SizedBox(height: 8),
+        const Text(
+          'Una colección vacía no confirma que el módulo que genera esos registros ya esté integrado.',
+        ),
         const SizedBox(height: 14),
         _FuentePanel<Inscripcion>(
           titulo: 'Inscripciones',
