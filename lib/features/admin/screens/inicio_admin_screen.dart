@@ -1,3 +1,5 @@
+import 'package:saman_deportivo/features/admin/dashboard/presentation/dashboard_admin_screen.dart';
+import 'package:saman_deportivo/features/admin/dashboard/presentation/analitica_admin_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/data/firestore_entrenador_repository.dart';
@@ -9,7 +11,6 @@ import 'package:flutter/material.dart';
 
 import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
-import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
 import 'package:saman_deportivo/models/enums.dart';
 
@@ -47,9 +48,7 @@ class InicioAdminScreen extends StatelessWidget {
           iconoSeleccionado: Icons.dashboard,
           // Las cifras del dashboard llegan con los módulos de deportes,
           // inscripciones y analítica.
-          pantalla: PanelBienvenida(
-            saludo: PanelBienvenida.componer('Hola', nombre),
-          ),
+          pantalla: DashboardAdminScreen(nombre: nombre),
         ),
         const DestinoNavegacion(
           etiqueta: 'Deportes',
@@ -89,10 +88,7 @@ class InicioAdminScreen extends StatelessWidget {
           etiqueta: 'Analítica',
           icono: Icons.bar_chart,
           iconoSeleccionado: Icons.bar_chart,
-          pantalla: SeccionPendiente(
-            titulo: 'Analítica',
-            icono: Icons.bar_chart,
-          ),
+          pantalla: AnaliticaAdminScreen(),
         ),
         DestinoNavegacion(
           etiqueta: 'Configuración',
