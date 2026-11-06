@@ -1,5 +1,11 @@
 import 'package:saman_deportivo/features/admin/dashboard/presentation/dashboard_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/dashboard/presentation/analitica_admin_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
+import 'package:saman_deportivo/features/admin/entrenadores/data/firestore_entrenador_repository.dart';
+import 'package:saman_deportivo/features/admin/entrenadores/data/firebase_agenda_gateway.dart';
+import 'package:saman_deportivo/features/admin/entrenadores/presentation/entrenadores_admin_screen.dart';
+import 'package:saman_deportivo/features/admin/entrenadores/presentation/horarios_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/deportes/presentation/deportes_admin_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -40,6 +46,8 @@ class InicioAdminScreen extends StatelessWidget {
           etiqueta: 'Dashboard',
           icono: Icons.dashboard_outlined,
           iconoSeleccionado: Icons.dashboard,
+          // Las cifras del dashboard llegan con los módulos de deportes,
+          // inscripciones y analítica.
           pantalla: DashboardAdminScreen(nombre: nombre),
         ),
         const DestinoNavegacion(
@@ -52,19 +60,20 @@ class InicioAdminScreen extends StatelessWidget {
           etiqueta: 'Entrenadores',
           icono: Icons.badge_outlined,
           iconoSeleccionado: Icons.badge,
-          pantalla: SeccionPendiente(
-            titulo: 'Entrenadores',
-            icono: Icons.badge,
-          ),
+          pantalla: EntrenadoresAdminScreen(),
         ),
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Horarios',
           icono: Icons.calendar_month_outlined,
           iconoSeleccionado: Icons.calendar_month,
-          pantalla: SeccionPendiente(
-            titulo: 'Horarios',
-            icono: Icons.calendar_month,
-          ),
+          // Los tests de InicioAdminScreen no inicializan Firebase.
+          pantalla: Firebase.apps.isEmpty
+              ? const HorariosAdminScreen()
+              : HorariosAdminScreen(
+                  deportes: FirestoreDeporteRepository(),
+                  entrenadores: FirestoreEntrenadorRepository(),
+                  agendaGateway: FirebaseAgendaGateway(),
+                ),
         ),
         const DestinoNavegacion(
           etiqueta: 'Inscripciones',

@@ -86,6 +86,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Fútbol sala'), findsOneWidget);
     expect(find.text('Baloncesto'), findsNothing);
+    // Regresión: escribir sin tilde debe encontrar «Fútbol».
+    await tester.enterText(find.byKey(const Key('buscar-deporte')), 'futbol');
+    await tester.pumpAndSettle();
+    expect(find.text('Fútbol sala'), findsOneWidget);
   });
 
   testWidgets('formulario valida antes de crear deporte', (tester) async {

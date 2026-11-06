@@ -117,6 +117,7 @@ service cloud.firestore {
         && d.creadoEn is timestamp;
     }
 
+    // A2.3 — Agenda protegida por Cloud Functions
     match /deportes/{codigo} {
       // La lectura del catalogo es publica (RF-05). No incluir datos privados.
       allow get, list: if true;
@@ -128,7 +129,13 @@ service cloud.firestore {
         && request.resource.data.cuposConfirmados == 0
         && request.resource.data.promedioCalificacion == 0
         && request.resource.data.totalResenas == 0
-        && request.resource.data.actualizadoEn == null;
+        && request.resource.data.actualizadoEn == null
+        // A2.3: la asignación inicial también pasa por callable.
+        && request.resource.data.entrenadorUid == null
+        && request.resource.data.entrenadorNombre == null
+        && request.resource.data.entrenadorEspecialidad == null
+        && request.resource.data.horarios.size() == 0
+        && request.resource.data.dias.size() == 0;
 
       // La administracion NO puede falsificar contadores/codigos/fechas.
       // Mariana definira por separado las transacciones protegidas para cupos.
@@ -137,8 +144,7 @@ service cloud.firestore {
         && request.resource.data.actualizadoEn is timestamp
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'nombre', 'descripcion', 'disciplina', 'costo', 'imagenUrl',
-          'cupoMaximo', 'entrenadorUid', 'entrenadorNombre',
-          'entrenadorEspecialidad', 'horarios', 'dias', 'activo', 'actualizadoEn'
+          'cupoMaximo', 'activo', 'actualizadoEn'
         ]);
 
       allow delete: if false;
