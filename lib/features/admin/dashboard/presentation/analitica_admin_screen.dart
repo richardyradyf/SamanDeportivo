@@ -1,3 +1,4 @@
+import 'package:saman_deportivo/features/admin/dashboard/presentation/panel_indicadores_operativos.dart';
 import 'package:flutter/material.dart';
 import 'package:saman_deportivo/features/admin/dashboard/data/dashboard_repository.dart';
 import 'package:saman_deportivo/features/admin/dashboard/domain/resumen_dashboard.dart';
@@ -109,17 +110,7 @@ class _ContenidoAnalitica extends StatelessWidget {
           },
         ),
         const SizedBox(height: 16),
-        const PanelAnalitico(
-          titulo: 'Indicadores por integrar',
-          child: Text(
-            'Los deportes más buscados requieren el registro de búsquedas '
-            'del catálogo (módulo de Gabriel). La evolución de inscripciones, '
-            'los pagos aprobados y los ingresos requieren las colecciones '
-            'y permisos de los módulos de Mariana y Andrés. '
-            'Todavía no se muestran cifras de esas fuentes.',
-            key: Key('a3-pendientes'),
-          ),
-        ),
+        const PanelIndicadoresOperativos(),
       ],
     );
   }

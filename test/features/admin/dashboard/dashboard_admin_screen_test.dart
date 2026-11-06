@@ -60,7 +60,13 @@ void main() {
     await _mostrar(tester, AnaliticaAdminScreen(repositorio: _DashboardFake()));
     expect(find.byType(BarChart), findsOneWidget);
     expect(find.byType(PieChart), findsOneWidget);
-    expect(find.byKey(const Key('a3-pendientes')), findsOneWidget);
+    expect(find.text('Indicadores operativos'), findsOneWidget);
+    expect(
+      find.byKey(const Key('a34-no-conectada-inscripciones')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('a34-no-conectada-pagos')), findsOneWidget);
+    expect(find.byKey(const Key('a34-no-conectada-busquedas')), findsOneWidget);
   });
 
   testWidgets('se adapta a pantallas estrechas', (tester) async {
