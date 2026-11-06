@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Solo en depuración: permite conectarse al emulador local de Firebase. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>
