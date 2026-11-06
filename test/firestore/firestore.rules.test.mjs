@@ -263,3 +263,23 @@ test('A1: ni siquiera el administrador puede falsificar el código del documento
     ...nuevoDeporteA1('FUT-99'), codigo: 'FUT-01',
   }));
 });
+
+// A2.3: toda modificación de entrenador y agenda pasa por Cloud Functions.
+test('A2.3: administrador no puede cambiar entrenador directamente', async () => {
+  await sembrarDeporteA1('FUT-81');
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'FUT-81'), {
+    entrenadorUid: 'coach-1', entrenadorNombre:'Coach', actualizadoEn:new Date(),
+  }));
+});
+test('A2.3: administrador no puede modificar horarios directamente', async () => {
+  await sembrarDeporteA1('FUT-82');
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'FUT-82'), {
+    horarios:[{dia:'lunes',horaInicio:'16:00',horaFin:'18:00',lugar:'Cancha A'}],
+    dias:['lunes'], actualizadoEn:new Date(),
+  }));
+});
+test('A2.3: administrador no puede crear deporte con agenda precargada', async () => {
+  await assertFails(setDoc(doc(admin(), 'deportes', 'FUT-83'), {
+    ...nuevoDeporteA1('FUT-83'), entrenadorUid:'ent-1',
+  }));
+});

@@ -5,7 +5,10 @@
   "scripts": {
     "test:rules": "firebase emulators:exec --config firebase.security.test.json --project demo-saman-perfil --only firestore \"node --test test/firestore/firestore.rules.test.mjs\"",
     "emulador": "firebase emulators:start --only auth,firestore",
-    "emulador:datos": "node scripts/cargar_datos_emulador.mjs"
+    "emulador:datos": "node scripts/cargar_datos_emulador.mjs",
+    "emulador:a2": "firebase emulators:start --only auth,firestore,functions",
+    "test:a2:local": "node --test functions/test/*.test.cjs",
+    "test:a2:emulator": "firebase emulators:exec --only auth,firestore,functions --project demo-saman-perfil \"node --test test/functions/a2_backend_emulator.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
