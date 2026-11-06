@@ -1,4 +1,3 @@
-
 enum ResultadoInscripcion {
   permitida,
   estudianteInactivo,
