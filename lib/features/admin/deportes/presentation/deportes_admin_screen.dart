@@ -1,3 +1,4 @@
+import 'package:saman_deportivo/features/admin/administracion/presentation/resenas_admin_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
@@ -277,6 +278,23 @@ class _DeportesAdminScreenState extends State<DeportesAdminScreen> {
                                               ? 'Desactivar'
                                               : 'Activar',
                                         ),
+                                      ),
+                                      OutlinedButton.icon(
+                                        key: Key('resenas-${deporte.codigo}'),
+                                        onPressed: () => Navigator.of(context)
+                                            .push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    ResenasAdminScreen(
+                                                      deporteInicial:
+                                                          deporte.codigo,
+                                                    ),
+                                              ),
+                                            ),
+                                        icon: const Icon(
+                                          Icons.rate_review_outlined,
+                                        ),
+                                        label: const Text('Ver reseñas'),
                                       ),
                                     ],
                                   ),

@@ -263,3 +263,79 @@ test('A1: ni siquiera el administrador puede falsificar el código del documento
     ...nuevoDeporteA1('FUT-99'), codigo: 'FUT-01',
   }));
 });
+
+// A3.2: PRUEBAS DE MODERACIÓN Y ESTADO DE ESTUDIANTES
+// Integrar con el test existente: usa env, admin(), estudiante() y sembrarDeporteA1().
+
+async function sembrarResenaA3(codigo = 'FUT-81') {
+  await sembrarDeporteA1(codigo);
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'deportes', codigo, 'resenas', 'uid-a'), {
+      estudianteNombre: 'Estudiante Uno', puntuacion: 5,
+      comentario: 'Buen entrenamiento', oculta: false,
+      fecha: new Date('2026-11-06T12:00:00Z'),
+    });
+  });
+}
+
+test('A3.2: administrador puede desactivar estudiante', async () => {
+  await assertSucceeds(updateDoc(doc(admin(), 'usuarios', 'uid-b'), { estado: 'inactivo' }));
+});
+
+test('A3.2: administrador puede reactivar estudiante', async () => {
+  await assertSucceeds(updateDoc(doc(admin(), 'usuarios', 'uid-b'), { estado: 'activo' }));
+});
+
+test('A3.2: estudiante no puede cambiar su propio estado', async () => {
+  await assertFails(updateDoc(doc(estudiante(), 'usuarios', 'uid-a'), { estado: 'inactivo' }));
+});
+
+test('A3.2: administrador no puede cambiar rol junto con estado', async () => {
+  await assertFails(updateDoc(doc(admin(), 'usuarios', 'uid-b'), {
+    estado: 'inactivo', rol: 'administrador',
+  }));
+});
+
+test('A3.2: administrador no puede cambiar estado de entrenadores', async () => {
+  await prepararEntrenador('uid-coach-a3');
+  await assertFails(updateDoc(doc(admin(), 'usuarios', 'uid-coach-a3'), {
+    estado: 'inactivo',
+  }));
+});
+
+test('A3.2: administrador no puede poner un estado inválido', async () => {
+  await assertFails(updateDoc(doc(admin(), 'usuarios', 'uid-b'), { estado: 'suspendido' }));
+});
+
+test('A3.2: administrador puede consultar reseñas de un deporte', async () => {
+  await sembrarResenaA3('FUT-81');
+  await assertSucceeds(getDocs(collection(admin(), 'deportes', 'FUT-81', 'resenas')));
+});
+
+test('A3.2: estudiante no puede consultar reseñas administrativas', async () => {
+  await assertFails(getDocs(collection(estudiante(), 'deportes', 'FUT-81', 'resenas')));
+});
+
+test('A3.2: administrador puede ocultar y volver a mostrar una reseña', async () => {
+  await assertSucceeds(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: true }));
+  await assertSucceeds(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: false }));
+});
+
+test('A3.2: administrador no puede alterar puntuación ni comentario', async () => {
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), {
+    puntuacion: 1, comentario: 'Editado sin autorización',
+  }));
+});
+
+test('A3.2: estudiante no puede ocultar reseñas de terceros', async () => {
+  await assertFails(updateDoc(doc(estudiante(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), {
+    oculta: true,
+  }));
+});
+
+test('A3.2: administrador no puede crear reseñas', async () => {
+  await assertFails(setDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-admin'), {
+    estudianteNombre: 'Administradora', puntuacion: 5,
+    comentario: 'Reseña fraudulenta', oculta: false, fecha: new Date(),
+  }));
+});

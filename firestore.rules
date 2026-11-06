@@ -65,7 +65,11 @@ service cloud.firestore {
       // entrenador se aprovisionan de manera privilegiada (Firebase Console).
       allow create: if nuevoEstudianteValido(uid);
       // Ni siquiera el admin puede promover roles desde el cliente.
-      allow update: if esPropietario(uid) && edicionPropiaValida();
+      allow update: if (esPropietario(uid) && edicionPropiaValida())
+        || (esAdministrador()
+          && resource.data.rol == 'estudiante'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado'])
+          && request.resource.data.estado in ['activo', 'inactivo']);
       allow delete: if false;
     }
 
@@ -138,6 +142,15 @@ service cloud.firestore {
         ]);
 
       allow delete: if false;
+
+      // A3.2: moderación limitada a ocultar/mostrar, sin alterar contenido.
+      match /resenas/{estudianteUid} {
+        allow get, list: if esAdministrador();
+        allow update: if esAdministrador()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['oculta'])
+          && request.resource.data.oculta is bool;
+        allow create, delete: if false;
+      }
     }
 
     match /{document=**} {

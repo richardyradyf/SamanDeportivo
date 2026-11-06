@@ -1,3 +1,5 @@
+import 'package:saman_deportivo/features/admin/administracion/presentation/estudiantes_admin_screen.dart';
+import 'package:saman_deportivo/features/admin/administracion/presentation/resenas_admin_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
@@ -148,6 +150,26 @@ class _ContenidoDashboard extends StatelessWidget {
               onPressed: () => LayoutResponsivo.irA(context, 5),
               icon: const Icon(Icons.bar_chart),
               label: const Text('Ver analítica'),
+            ),
+            OutlinedButton.icon(
+              key: const Key('admin-gestionar-estudiantes'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const EstudiantesAdminScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.school_outlined),
+              label: const Text('Gestionar estudiantes'),
+            ),
+            OutlinedButton.icon(
+              key: const Key('admin-moderar-resenas'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ResenasAdminScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.rate_review_outlined),
+              label: const Text('Moderar reseñas'),
             ),
           ],
         ),
