@@ -7,35 +7,42 @@ import 'package:saman_deportivo/features/entrenador/screens/inicio_entrenador_sc
 import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_screen.dart';
 import 'package:saman_deportivo/features/perfil/presentation/perfil_screen.dart';
 import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
 import 'package:saman_deportivo/models/persona.dart';
 
-/// Construye la pestaña "Perfil" para la persona en sesión.
+/// Construye la pantalla de perfil de la persona autenticada.
 typedef ConstructorPerfil = Widget Function(
   Persona persona,
   SesionController sesion,
 );
 
-/// Puerta de entrada de la app: escucha al [SesionController] y decide
-/// qué pantalla mostrar según el estado de la sesión y el rol.
+/// Obtiene las inscripciones de un estudiante según su UID.
 ///
-/// - cargando     → indicador de carga
-/// - sinSesion    → [sinSesion] (bienvenida o login)
-/// - sinPerfil    → mensaje de error con opción de cerrar sesión
-/// - autenticado  → inicio del estudiante, entrenador o administrador
+/// Se recibe desde la configuración de la aplicación.
+/// Así AuthGate no depende directamente de Firebase.
+typedef ObtenerInscripciones = Stream<List<Inscripcion>> Function(
+  String estudianteUid,
+);
+
 class AuthGate extends StatelessWidget {
   const AuthGate({
     super.key,
     required this.sinSesion,
     this.construirPerfil = _perfilDeFirestore,
+    this.obtenerInscripciones,
   });
 
-  /// Pantalla para quien no ha iniciado sesión. Se recibe desde afuera
-  /// para no depender de una pantalla concreta mientras el login no esté.
+  /// Pantalla que se muestra cuando no hay sesión.
   final Widget sinSesion;
 
-  /// Permite cambiar el perfil real (que usa Firestore) por uno falso en
-  /// las pruebas.
+  /// Permite utilizar un perfil falso en las pruebas.
   final ConstructorPerfil construirPerfil;
+
+  /// Función opcional para consultar inscripciones.
+  ///
+  /// Si no se proporciona, la navegación conserva
+  /// su comportamiento anterior.
+  final ObtenerInscripciones? obtenerInscripciones;
 
   static Widget _perfilDeFirestore(Persona persona, SesionController sesion) {
     return PerfilScreen(
@@ -53,23 +60,28 @@ class AuthGate extends StatelessWidget {
     switch (sesion.estado) {
       case EstadoSesion.cargando:
         return const _Cargando();
+
       case EstadoSesion.sinSesion:
         return sinSesion;
+
       case EstadoSesion.sinPerfil:
         return _SinPerfil(
           mensaje: sesion.error,
           onCerrarSesion: sesion.cerrarSesion,
         );
+
       case EstadoSesion.autenticado:
-        // No debería pasar, pero si el estado llega antes que la persona
-        // esperamos en vez de fallar.
-        if (persona == null) return const _Cargando();
+        if (persona == null) {
+          return const _Cargando();
+        }
+
         return _inicioSegunRol(persona, sesion);
     }
   }
 
   Widget _inicioSegunRol(Persona persona, SesionController sesion) {
-    // La llave con el uid reinicia la navegación si cambia el usuario.
+    // La clave reinicia la navegación cuando cambia
+    // el usuario autenticado.
     final llave = ValueKey(persona.uid);
 
     return switch (persona.rol) {
@@ -78,13 +90,19 @@ class AuthGate extends StatelessWidget {
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+
+        // Solo consulta inscripciones si la aplicación
+        // proporcionó una función para obtenerlas.
+        inscripcionesStream: obtenerInscripciones?.call(persona.uid),
       ),
+
       Rol.entrenador => InicioEntrenadorScreen(
         key: llave,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
       ),
+
       Rol.administrador => InicioAdminScreen(
         key: llave,
         nombre: persona.nombre,

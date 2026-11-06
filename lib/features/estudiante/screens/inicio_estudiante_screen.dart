@@ -6,6 +6,7 @@ import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
 import 'package:saman_deportivo/features/estudiante/widgets/sin_inscripciones_card.dart';
 import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
 
 /// Pantalla de inicio del estudiante, según el Figma:
 /// Inicio, Explorar, Mis deportes, Inscripciones y Perfil.
@@ -20,6 +21,8 @@ class InicioEstudianteScreen extends StatelessWidget {
     required this.onCerrarSesion,
     this.perfil,
     this.reloj,
+    this.inscripcionesStream,
+    this.onCancelarInscripcion,
   });
 
   final String nombre;
@@ -32,6 +35,8 @@ class InicioEstudianteScreen extends StatelessWidget {
   /// De dónde sale la hora para el saludo. En las pruebas se pasa una hora
   /// fija; en la app se usa la hora real.
   final DateTime Function()? reloj;
+  final Stream<List<Inscripcion>>? inscripcionesStream;
+  final ValueChanged<Inscripcion>? onCancelarInscripcion;
 
   static const indiceExplorar = 1;
 
@@ -78,13 +83,16 @@ class InicioEstudianteScreen extends StatelessWidget {
             icono: Icons.sports_soccer,
           ),
         ),
-        const DestinoNavegacion(
+
+        DestinoNavegacion(
           etiqueta: 'Inscripciones',
           icono: Icons.assignment_outlined,
           iconoSeleccionado: Icons.assignment,
-          pantalla: MisInscripcionesScreen(),
+          pantalla: MisInscripcionesScreen(
+            inscripcionesStream: inscripcionesStream,
+            onCancelarInscripcion: onCancelarInscripcion,
+          ),
         ),
-
         DestinoNavegacion(
           etiqueta: 'Perfil',
           icono: Icons.person_outline,
