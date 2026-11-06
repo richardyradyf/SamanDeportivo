@@ -18,7 +18,7 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
        auth = auth ?? FirebaseAuth.instance;
 
   // ---------------------------------------------------------
-  // 1. INSCRIBIR ESTUDIANTE
+  // 1. INSCRIBIRSE
   // ---------------------------------------------------------
 
   @override
@@ -45,12 +45,10 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         .doc(inscripcionId);
 
     return firestore.runTransaction((transaction) async {
-      // Leer los documentos antes de realizar cambios.
       final estudianteDoc = await transaction.get(estudianteRef);
       final deporteDoc = await transaction.get(deporteRef);
       final inscripcionDoc = await transaction.get(inscripcionRef);
 
-      // Verificar que el estudiante exista.
       if (!estudianteDoc.exists || estudianteDoc.data() == null) {
         throw const InscripcionException('No se encontró el estudiante.');
       }
@@ -68,12 +66,10 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         datosEstudiante,
       );
 
-      // Verificar que el estudiante esté activo.
       if (!estudianteActual.estaActivo) {
         throw InscripcionException.estudianteInactivo;
       }
 
-      // Verificar que el deporte exista.
       if (!deporteDoc.exists || deporteDoc.data() == null) {
         throw InscripcionException.deporteInactivo;
       }
@@ -85,34 +81,28 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
       }
 
       final ahora = DateTime.now();
-
       Inscripcion? anterior;
 
       if (inscripcionDoc.exists && inscripcionDoc.data() != null) {
         anterior = Inscripcion.fromMap(inscripcionId, inscripcionDoc.data()!);
       }
 
-      // Comprobar si existe una inscripción pendiente vencida.
       final pendienteVencida = anterior != null && anterior.estaVencida(ahora);
 
-      // Evitar inscripciones duplicadas que retengan cupo.
       if (anterior != null && anterior.ocupaCupo && !pendienteVencida) {
         throw InscripcionException.yaInscrito;
       }
 
-      // Si la inscripción anterior venció, descontar
-      // temporalmente el cupo que estaba reteniendo.
       final cuposLiberados = pendienteVencida ? 1 : 0;
 
       final ocupadosAjustados = deporteActual.cuposOcupados - cuposLiberados;
 
       if (ocupadosAjustados < 0) {
         throw const InscripcionException(
-          'Los cupos del deporte necesitan revisión.',
+          'Los contadores de cupos necesitan revisión.',
         );
       }
 
-      // Comprobar la disponibilidad real del deporte.
       if (ocupadosAjustados >= deporteActual.cupoMaximo) {
         throw InscripcionException.sinCupos;
       }
@@ -120,14 +110,12 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
       Inscripcion nuevaInscripcion;
 
       if (anterior == null) {
-        // Crear una inscripción nueva.
         nuevaInscripcion = Inscripcion.nueva(
           estudiante: estudianteActual,
           deporte: deporteActual,
           ahora: ahora,
         );
       } else {
-        // Registrar la expiración si la inscripción venció.
         final inscripcionAnterior = pendienteVencida
             ? anterior.conEstado(
                 EstadoInscripcion.expirada,
@@ -137,7 +125,6 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
               )
             : anterior;
 
-        // Reinscribir conservando el historial.
         nuevaInscripcion = inscripcionAnterior.reinscribir(
           estudiante: estudianteActual,
           deporte: deporteActual,
@@ -145,8 +132,6 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         );
       }
 
-      // Guardar la inscripción y el contador de cupos
-      // dentro de una misma transacción.
       transaction.set(inscripcionRef, nuevaInscripcion.toMap());
 
       transaction.update(deporteRef, {'cuposOcupados': ocupadosAjustados + 1});
@@ -188,14 +173,12 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         inscripcionDoc.data()!,
       );
 
-      // Solo el propietario puede cancelar.
       if (inscripcion.estudianteUid != usuario.uid) {
         throw const InscripcionException(
           'No puedes cancelar una inscripción de otro estudiante.',
         );
       }
 
-      // No cancelar inscripciones que ya liberaron su cupo.
       if (!inscripcion.ocupaCupo) {
         throw const InscripcionException(
           'Esta inscripción ya no está vigente.',
@@ -217,7 +200,6 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         deporteDoc.data()!,
       );
 
-      // Comprobar que los contadores sean consistentes.
       if (deporte.cuposOcupados <= 0 ||
           (inscripcion.estado == EstadoInscripcion.confirmada &&
               deporte.cuposConfirmados <= 0)) {
@@ -231,7 +213,6 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         responsableUid: responsableUid,
       );
 
-      // Guardar cancelación y liberar cupo.
       transaction.update(inscripcionRef, cancelada.toMap());
 
       transaction.update(deporteRef, {
@@ -243,7 +224,139 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
   }
 
   // ---------------------------------------------------------
-  // 3. CONSULTAR INSCRIPCIONES DEL ESTUDIANTE
+  // 3. EXPIRAR UNA INSCRIPCIÓN VENCIDA
+  // ---------------------------------------------------------
+
+  @override
+  Future<void> expirar(String inscripcionId, {required String motivo}) async {
+    final resultado = await _expirarSiVencida(inscripcionId, motivo: motivo);
+
+    if (!resultado) {
+      throw const InscripcionException(
+        'La inscripción no está pendiente y vencida.',
+      );
+    }
+  }
+
+  // Expira una reserva vencida y libera su cupo.
+  // Devuelve false si ya no corresponde expirar.
+  Future<bool> _expirarSiVencida(
+    String inscripcionId, {
+    required String motivo,
+  }) async {
+    final usuario = auth.currentUser;
+
+    if (usuario == null) {
+      throw const InscripcionException('Debes iniciar sesión.');
+    }
+
+    final inscripcionRef = firestore
+        .collection('inscripciones')
+        .doc(inscripcionId);
+
+    return firestore.runTransaction((transaction) async {
+      final inscripcionDoc = await transaction.get(inscripcionRef);
+
+      if (!inscripcionDoc.exists || inscripcionDoc.data() == null) {
+        return false;
+      }
+
+      final inscripcion = Inscripcion.fromMap(
+        inscripcionId,
+        inscripcionDoc.data()!,
+      );
+
+      // Esta implementación local solo trabaja con
+      // inscripciones del estudiante autenticado.
+      if (inscripcion.estudianteUid != usuario.uid) {
+        throw const InscripcionException(
+          'No tienes permiso para modificar esta inscripción.',
+        );
+      }
+
+      final ahora = DateTime.now();
+
+      if (!inscripcion.estaVencida(ahora)) {
+        return false;
+      }
+
+      final deporteRef = firestore
+          .collection('deportes')
+          .doc(inscripcion.deporteId);
+
+      final deporteDoc = await transaction.get(deporteRef);
+
+      if (!deporteDoc.exists || deporteDoc.data() == null) {
+        throw const InscripcionException('No se encontró el deporte asociado.');
+      }
+
+      final deporte = Deporte.fromMap(
+        inscripcion.deporteId,
+        deporteDoc.data()!,
+      );
+
+      if (deporte.cuposOcupados <= 0) {
+        throw const InscripcionException(
+          'Los contadores de cupos necesitan revisión.',
+        );
+      }
+
+      final expirada = inscripcion.conEstado(
+        EstadoInscripcion.expirada,
+        responsableUid: usuario.uid,
+        motivo: motivo,
+        fecha: ahora,
+      );
+
+      transaction.update(inscripcionRef, expirada.toMap());
+
+      transaction.update(deporteRef, {
+        'cuposOcupados': deporte.cuposOcupados - 1,
+      });
+
+      return true;
+    });
+  }
+
+  // ---------------------------------------------------------
+  // 4. EXPIRAR RESERVAS VENCIDAS DEL ESTUDIANTE ACTUAL
+  // ---------------------------------------------------------
+
+  @override
+  Future<int> expirarVencidas() async {
+    final usuario = auth.currentUser;
+
+    if (usuario == null) {
+      throw const InscripcionException('Debes iniciar sesión.');
+    }
+
+    final ahora = DateTime.now();
+
+    final consulta = await firestore
+        .collection('inscripciones')
+        .where('estudianteUid', isEqualTo: usuario.uid)
+        .where('estado', isEqualTo: EstadoInscripcion.pendiente.name)
+        .where('fechaLimitePago', isLessThan: Timestamp.fromDate(ahora))
+        .get();
+
+    int totalExpiradas = 0;
+
+    for (final documento in consulta.docs) {
+      final expirada = await _expirarSiVencida(
+        documento.id,
+        motivo: 'Plazo de pago vencido',
+      );
+
+      if (expirada) {
+        totalExpiradas++;
+      }
+    }
+
+    return totalExpiradas;
+  }
+
+  // ---------------------------------------------------------
+  // 5. CONSULTAR INSCRIPCIONES DEL ESTUDIANTE
   // ---------------------------------------------------------
 
   @override
@@ -267,7 +380,6 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
               .map((doc) => Inscripcion.fromMap(doc.id, doc.data()))
               .toList();
 
-          // Mostrar primero las inscripciones más recientes.
           inscripciones.sort(
             (a, b) => b.fechaInscripcion.compareTo(a.fechaInscripcion),
           );
@@ -277,7 +389,7 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
   }
 
   // ---------------------------------------------------------
-  // 4. CONSULTAR INSCRITOS CONFIRMADOS DEL DEPORTE
+  // 6. CONSULTAR CONFIRMADAS DE UN DEPORTE
   // ---------------------------------------------------------
 
   @override
@@ -292,7 +404,6 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
               .map((doc) => Inscripcion.fromMap(doc.id, doc.data()))
               .toList();
 
-          // Ordenar estudiantes alfabéticamente.
           inscripciones.sort(
             (a, b) => a.estudianteNombre.compareTo(b.estudianteNombre),
           );
@@ -302,7 +413,7 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
   }
 
   // ---------------------------------------------------------
-  // 5. CONSULTAR TODAS LAS INSCRIPCIONES
+  // 7. CONSULTAR TODAS LAS INSCRIPCIONES
   // ---------------------------------------------------------
 
   @override
@@ -312,7 +423,6 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
           .map((doc) => Inscripcion.fromMap(doc.id, doc.data()))
           .toList();
 
-      // Ordenar por fecha, de la más reciente a la antigua.
       inscripciones.sort(
         (a, b) => b.fechaInscripcion.compareTo(a.fechaInscripcion),
       );
@@ -322,31 +432,15 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
   }
 
   // ---------------------------------------------------------
-  // 6. CONFIRMAR INSCRIPCIÓN DESPUÉS DEL PAGO
+  // 8. CONFIRMAR INSCRIPCIÓN DESPUÉS DEL PAGO
   // ---------------------------------------------------------
 
   @override
   Future<void> confirmar(String inscripcionId, {required String pagoId}) {
-    // Pendiente de integrar con el módulo de pagos de Andrés.
-    // La aprobación del pago debe verificarse de forma segura.
-    throw UnimplementedError('Confirmación de pago pendiente');
-  }
-
-  // ---------------------------------------------------------
-  // 7. EXPIRAR UNA INSCRIPCIÓN
-  // ---------------------------------------------------------
-
-  @override
-  Future<void> expirar(String inscripcionId, {required String motivo}) {
-    throw UnimplementedError('Expiración de inscripción pendiente');
-  }
-
-  // ---------------------------------------------------------
-  // 8. EXPIRAR INSCRIPCIONES VENCIDAS
-  // ---------------------------------------------------------
-
-  @override
-  Future<int> expirarVencidas() {
-    throw UnimplementedError('Expiración de inscripciones vencidas pendiente');
+    // No se debe confirmar un pago únicamente con
+    // información proporcionada desde Flutter.
+    throw UnimplementedError(
+      'Confirmación pendiente de validación segura del pago.',
+    );
   }
 }
