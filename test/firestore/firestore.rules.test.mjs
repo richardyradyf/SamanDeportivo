@@ -187,3 +187,79 @@ test('estudiante NO puede listar usuarios', async () => {
     getDocs(collection(estudiante(), 'usuarios')),
   );
 });
+
+// A1 HITO 3 - PRUEBAS DE DEPORTES (Alexander)
+const nuevoDeporteA1 = (codigo) => ({
+  codigo, nombre: 'Fútbol sala', descripcion: 'Entrenamiento',
+  disciplina: 'colectivo', costo: 10, imagenUrl: null,
+  cupoMaximo: 20, cuposOcupados: 0, cuposConfirmados: 0,
+  entrenadorUid: null, entrenadorNombre: null, entrenadorEspecialidad: null,
+  horarios: [], dias: [], activo: true,
+  promedioCalificacion: 0, totalResenas: 0,
+  creadoEn: new Date('2026-11-05T10:00:00Z'), actualizadoEn: null,
+});
+
+async function sembrarDeporteA1(codigo, modificaciones = {}) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'deportes', codigo), {
+      ...nuevoDeporteA1(codigo), ...modificaciones,
+    });
+  });
+}
+
+test('A1: administrador crea un deporte válido', async () => {
+  await assertSucceeds(setDoc(
+    doc(admin(), 'deportes', 'FUT-91'), nuevoDeporteA1('FUT-91'),
+  ));
+});
+
+test('A1: estudiante no crea deportes', async () => {
+  await assertFails(setDoc(
+    doc(estudiante(), 'deportes', 'FUT-92'), nuevoDeporteA1('FUT-92'),
+  ));
+});
+
+test('A1: un visitante puede leer el catálogo', async () => {
+  await sembrarDeporteA1('FUT-93');
+  await assertSucceeds(getDocs(collection(env.unauthenticatedContext().firestore(), 'deportes')));
+});
+
+test('A1: administrador edita nombre y cupo máximo', async () => {
+  await sembrarDeporteA1('FUT-94');
+  await assertSucceeds(updateDoc(doc(admin(), 'deportes', 'FUT-94'), {
+    nombre: 'Fútbol universitario', cupoMaximo: 25, actualizadoEn: new Date(),
+  }));
+});
+
+test('A1: estudiante no edita deportes', async () => {
+  await sembrarDeporteA1('FUT-95');
+  await assertFails(updateDoc(doc(estudiante(), 'deportes', 'FUT-95'), {
+    nombre: 'Cambio no autorizado', actualizadoEn: new Date(),
+  }));
+});
+
+test('A1: administrador no altera directamente contadores de cupos', async () => {
+  await sembrarDeporteA1('FUT-96');
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'FUT-96'), {
+    cuposOcupados: 5, actualizadoEn: new Date(),
+  }));
+});
+
+test('A1: administrador no reduce cupo bajo ocupación existente', async () => {
+  await sembrarDeporteA1('FUT-97', { cuposOcupados: 7, cuposConfirmados: 4 });
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'FUT-97'), {
+    cupoMaximo: 6, actualizadoEn: new Date(),
+  }));
+});
+
+test('A1: administrador no crea deporte con contador precargado', async () => {
+  await assertFails(setDoc(doc(admin(), 'deportes', 'FUT-98'), {
+    ...nuevoDeporteA1('FUT-98'), cuposOcupados: 1,
+  }));
+});
+
+test('A1: ni siquiera el administrador puede falsificar el código del documento', async () => {
+  await assertFails(setDoc(doc(admin(), 'deportes', 'FUT-99'), {
+    ...nuevoDeporteA1('FUT-99'), codigo: 'FUT-01',
+  }));
+});

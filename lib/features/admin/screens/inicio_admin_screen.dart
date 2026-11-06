@@ -1,3 +1,4 @@
+import 'package:saman_deportivo/features/admin/deportes/presentation/deportes_admin_screen.dart';
 import 'package:flutter/material.dart';
 
 import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
@@ -48,10 +49,7 @@ class InicioAdminScreen extends StatelessWidget {
           etiqueta: 'Deportes',
           icono: Icons.sports_soccer_outlined,
           iconoSeleccionado: Icons.sports_soccer,
-          pantalla: SeccionPendiente(
-            titulo: 'Deportes',
-            icono: Icons.sports_soccer,
-          ),
+          pantalla: DeportesAdminScreen(),
         ),
         const DestinoNavegacion(
           etiqueta: 'Entrenadores',
