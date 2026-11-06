@@ -69,6 +69,46 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------------------------------------------------------------
+    // Hito 3 - REGLAS PROVISIONALES para desarrollar.
+    // Permiten trabajar con sesión iniciada mientras se programan los
+    // módulos. Alexander las reemplaza por las reglas finales por rol.
+    // ---------------------------------------------------------------
+    match /deportes/{codigo} {
+      allow read: if true;                // el landing lee sin sesión
+      allow write: if autenticado();
+
+      match /resenas/{estudianteUid} {
+        allow read: if true;
+        allow write: if autenticado();
+      }
+    }
+
+    match /inscripciones/{inscripcionId} {
+      allow read, write: if autenticado();
+    }
+
+    match /pagos/{pagoId} {
+      allow read, write: if autenticado();
+    }
+
+    match /asistencias/{asistenciaId} {
+      allow read, write: if autenticado();
+    }
+
+    match /busquedas/{busquedaId} {
+      allow create: if true;              // también desde el landing
+      allow read: if autenticado();
+    }
+
+    match /cedulas/{cedula} {
+      allow read, write: if autenticado();
+    }
+
+    match /carnets/{carnet} {
+      allow read, write: if autenticado();
+    }
+
     // Hito 2: cerrado intencionalmente hasta integrar la lógica Hito 3.
     // Agregar reglas por entidad de modo revisado, nunca allow write: if true.
     match /{document=**} {
