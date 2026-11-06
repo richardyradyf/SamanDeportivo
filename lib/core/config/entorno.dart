@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 /// Conexión opcional al emulador de Firebase para desarrollar.
@@ -20,4 +21,6 @@ Future<void> conectarEmuladorSiCorresponde() async {
 
   FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
   await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+  FirebaseFunctions.instanceFor(region: 'us-central1')
+      .useFunctionsEmulator(host, 5001);
 }

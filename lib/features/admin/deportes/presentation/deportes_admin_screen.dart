@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:saman_deportivo/core/utils/busqueda_normalizada.dart';
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
@@ -182,7 +183,7 @@ class _DeportesAdminScreenState extends State<DeportesAdminScreen> {
                       if (!snapshot.hasData) {
                         return const Center(child: CircularProgressIndicator());
                       }
-                      final termino = _busqueda.text.trim().toLowerCase();
+                      final termino = normalizarBusqueda(_busqueda.text.trim());
                       final resultado =
                           snapshot.data!
                               .where(
@@ -192,12 +193,10 @@ class _DeportesAdminScreenState extends State<DeportesAdminScreen> {
                               .where(
                                 (deporte) =>
                                     termino.isEmpty ||
-                                    deporte.codigo.toLowerCase().contains(
-                                      termino,
-                                    ) ||
-                                    deporte.nombre.toLowerCase().contains(
-                                      termino,
-                                    ),
+                                    normalizarBusqueda(deporte.codigo)
+                                        .contains(termino) ||
+                                    normalizarBusqueda(deporte.nombre)
+                                        .contains(termino),
                               )
                               .toList()
                             ..sort((a, b) => a.nombre.compareTo(b.nombre));
