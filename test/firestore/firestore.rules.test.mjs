@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 let env;
 const datosA = {
@@ -283,3 +283,145 @@ test('A2.3: administrador no puede crear deporte con agenda precargada', async (
     ...nuevoDeporteA1('FUT-83'), entrenadorUid:'ent-1',
   }));
 });
+
+// A3.2: PRUEBAS DE MODERACIÓN Y ESTADO DE ESTUDIANTES
+// Integrar con el test existente: usa env, admin(), estudiante() y sembrarDeporteA1().
+
+async function sembrarResenaA3(codigo = 'FUT-81') {
+  await sembrarDeporteA1(codigo);
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'deportes', codigo, 'resenas', 'uid-a'), {
+      estudianteNombre: 'Estudiante Uno', puntuacion: 5,
+      comentario: 'Buen entrenamiento', oculta: false,
+      fecha: new Date('2026-11-06T12:00:00Z'),
+    });
+  });
+}
+
+test('A3.2: administrador puede desactivar estudiante', async () => {
+  await assertSucceeds(updateDoc(doc(admin(), 'usuarios', 'uid-b'), { estado: 'inactivo' }));
+});
+
+test('A3.2: administrador puede reactivar estudiante', async () => {
+  await assertSucceeds(updateDoc(doc(admin(), 'usuarios', 'uid-b'), { estado: 'activo' }));
+});
+
+test('A3.2: estudiante no puede cambiar su propio estado', async () => {
+  await assertFails(updateDoc(doc(estudiante(), 'usuarios', 'uid-a'), { estado: 'inactivo' }));
+});
+
+test('A3.2: administrador no puede cambiar rol junto con estado', async () => {
+  await assertFails(updateDoc(doc(admin(), 'usuarios', 'uid-b'), {
+    estado: 'inactivo', rol: 'administrador',
+  }));
+});
+
+test('A3.2: administrador no puede cambiar estado de entrenadores', async () => {
+  await prepararEntrenador('uid-coach-a3');
+  await assertFails(updateDoc(doc(admin(), 'usuarios', 'uid-coach-a3'), {
+    estado: 'inactivo',
+  }));
+});
+
+test('A3.2: administrador no puede poner un estado inválido', async () => {
+  await assertFails(updateDoc(doc(admin(), 'usuarios', 'uid-b'), { estado: 'suspendido' }));
+});
+
+test('A3.2: administrador puede consultar reseñas de un deporte', async () => {
+  await sembrarResenaA3('FUT-81');
+  await assertSucceeds(getDocs(collection(admin(), 'deportes', 'FUT-81', 'resenas')));
+});
+
+test('A3.2: estudiante no puede consultar reseñas administrativas', async () => {
+  await assertFails(getDocs(collection(estudiante(), 'deportes', 'FUT-81', 'resenas')));
+});
+
+test('A3.2: administrador puede ocultar y volver a mostrar una reseña', async () => {
+  await assertSucceeds(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: true }));
+  await assertSucceeds(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: false }));
+});
+
+test('A3.2: administrador no puede alterar puntuación ni comentario', async () => {
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), {
+    puntuacion: 1, comentario: 'Editado sin autorización',
+  }));
+});
+
+test('A3.2: estudiante no puede ocultar reseñas de terceros', async () => {
+  await assertFails(updateDoc(doc(estudiante(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), {
+    oculta: true,
+  }));
+});
+
+test('A3.2: administrador no puede crear reseñas', async () => {
+  await assertFails(setDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-admin'), {
+    estudianteNombre: 'Administradora', puntuacion: 5,
+    comentario: 'Reseña fraudulenta', oculta: false, fecha: new Date(),
+  }));
+});
+
+// A3.5 — PRUEBAS DE LECTURA ADMINISTRATIVA DE FUENTES OPERATIVAS
+// Requiere los helpers existentes env, admin(), estudiante() y prepararEntrenador().
+// No introduce permisos de escritura para ningún rol.
+const fuentesA35 = ['inscripciones', 'pagos', 'busquedas'];
+
+async function sembrarFuenteA35(nombre) {
+  const id = `a35_seguridad_${nombre}`;
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), nombre, id), {
+      origen: 'prueba-reglas-a35',
+      fecha: new Date('2026-11-06T15:00:00Z'),
+    });
+  });
+  return id;
+}
+
+for (const nombre of fuentesA35) {
+  test(`A3.5: administrador puede leer un documento de ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertSucceeds(getDoc(doc(admin(), nombre, id)));
+  });
+
+  test(`A3.5: administrador puede listar ${nombre}`, async () => {
+    await sembrarFuenteA35(nombre);
+    await assertSucceeds(getDocs(collection(admin(), nombre)));
+  });
+
+  test(`A3.5: estudiante NO puede leer un documento de ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertFails(getDoc(doc(estudiante(), nombre, id)));
+  });
+
+  test(`A3.5: estudiante NO puede listar ${nombre}`, async () => {
+    await assertFails(getDocs(collection(estudiante(), nombre)));
+  });
+
+  test(`A3.5: entrenador NO puede listar ${nombre}`, async () => {
+    const coach = await prepararEntrenador(`a35-coach-${nombre}`);
+    await assertFails(getDocs(collection(coach, nombre)));
+  });
+
+  test(`A3.5: visitante NO puede leer ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    const anon = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anon, nombre, id)));
+  });
+
+  test(`A3.5: administrador NO puede crear ${nombre}`, async () => {
+    await assertFails(setDoc(doc(admin(), nombre, `a35_creacion_${nombre}`), {
+      origen: 'no-autorizado',
+    }));
+  });
+
+  test(`A3.5: administrador NO puede modificar ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertFails(updateDoc(doc(admin(), nombre, id), {
+      origen: 'modificado',
+    }));
+  });
+
+  test(`A3.5: administrador NO puede borrar ${nombre}`, async () => {
+    const id = await sembrarFuenteA35(nombre);
+    await assertFails(deleteDoc(doc(admin(), nombre, id)));
+  });
+}
