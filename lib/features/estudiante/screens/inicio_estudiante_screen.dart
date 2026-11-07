@@ -4,8 +4,10 @@ import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/catalogo_screen.dart';
 import 'package:saman_deportivo/features/estudiante/widgets/sin_inscripciones_card.dart';
 import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/repositories/deporte_repository.dart';
 
 /// Pantalla de inicio del estudiante, según el Figma:
 /// Inicio, Explorar, Mis deportes, Inscripciones y Perfil.
@@ -20,6 +22,7 @@ class InicioEstudianteScreen extends StatelessWidget {
     required this.onCerrarSesion,
     this.perfil,
     this.reloj,
+    this.deportes,
   });
 
   final String nombre;
@@ -32,6 +35,10 @@ class InicioEstudianteScreen extends StatelessWidget {
   /// De dónde sale la hora para el saludo. En las pruebas se pasa una hora
   /// fija; en la app se usa la hora real.
   final DateTime Function()? reloj;
+
+  /// Repositorio del catálogo. En las pruebas se pasa uno falso; si es
+  /// null, el catálogo usa Firestore.
+  final DeporteRepository? deportes;
 
   static const indiceExplorar = 1;
 
@@ -63,11 +70,11 @@ class InicioEstudianteScreen extends StatelessWidget {
             ),
           ),
         ),
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Explorar',
           icono: Icons.search,
           iconoSeleccionado: Icons.search,
-          pantalla: SeccionPendiente(titulo: 'Explorar', icono: Icons.search),
+          pantalla: CatalogoScreen(repositorio: deportes),
         ),
         const DestinoNavegacion(
           etiqueta: 'Mis deportes',
