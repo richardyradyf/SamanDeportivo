@@ -33,6 +33,26 @@ void main() {
     });
   });
 
+  group('Calificación', () {
+    test('promedio con coma y total en singular o plural', () {
+      final base = _conCupos(20, 0);
+
+      expect(textoCalificacion(base), 'Sin calificaciones');
+      expect(
+        textoCalificacion(base.copyWith(promedioCalificacion: 4.5, totalResenas: 12)),
+        '4,5 · 12 reseñas',
+      );
+      expect(
+        textoCalificacion(base.copyWith(promedioCalificacion: 5, totalResenas: 1)),
+        '5,0 · 1 reseña',
+      );
+    });
+
+    test('fecha corta con día y mes de dos cifras', () {
+      expect(fechaCorta(DateTime(2026, 3, 7)), '07/03/2026');
+    });
+  });
+
   group('Resumen de horarios', () {
     test('une los días en orden cuando empiezan a la misma hora', () {
       final resumen = resumenHorarios([

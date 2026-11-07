@@ -64,6 +64,14 @@ class TarjetaDeporte extends StatelessWidget {
                     texto: deporte.entrenadorNombre ?? 'Entrenador por asignar',
                     estilo: textoSecundario,
                   ),
+                  const SizedBox(height: 4),
+                  _Dato(
+                    icono: deporte.totalResenas > 0
+                        ? Icons.star
+                        : Icons.star_border,
+                    texto: textoCalificacion(deporte),
+                    estilo: textoSecundario,
+                  ),
                   const SizedBox(height: 12),
                   EtiquetaCupos(deporte: deporte),
                   if (onVer != null) ...[

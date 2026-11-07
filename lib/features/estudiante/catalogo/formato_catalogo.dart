@@ -52,6 +52,26 @@ String resumenHorarios(List<HorarioSesion> horarios) {
   return '$dias · $hora';
 }
 
+/// Promedio con una cifra decimal y coma, como se escribe en español: "4,5".
+String textoPromedio(double promedio) =>
+    promedio.toStringAsFixed(1).replaceAll('.', ',');
+
+/// Calificación del deporte para la tarjeta y el detalle (RF-17):
+/// "4,5 · 12 reseñas", "5,0 · 1 reseña" o "Sin calificaciones".
+String textoCalificacion(Deporte deporte) {
+  final total = deporte.totalResenas;
+  if (total <= 0) return 'Sin calificaciones';
+  final resenas = total == 1 ? '1 reseña' : '$total reseñas';
+  return '${textoPromedio(deporte.promedioCalificacion)} · $resenas';
+}
+
+/// Fecha corta para las reseñas: "07/11/2026".
+String fechaCorta(DateTime fecha) {
+  final dia = fecha.day.toString().padLeft(2, '0');
+  final mes = fecha.month.toString().padLeft(2, '0');
+  return '$dia/$mes/${fecha.year}';
+}
+
 /// Nombre corto de la disciplina para los chips de filtro.
 String etiquetaCortaDisciplina(Disciplina disciplina) {
   return switch (disciplina) {

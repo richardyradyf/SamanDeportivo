@@ -5,9 +5,12 @@ import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/catalogo_screen.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/detalle_deporte_screen.dart';
 import 'package:saman_deportivo/features/estudiante/widgets/sin_inscripciones_card.dart';
 import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
+import 'package:saman_deportivo/repositories/resena_repository.dart';
 
 /// Pantalla de inicio del estudiante, según el Figma:
 /// Inicio, Explorar, Mis deportes, Inscripciones y Perfil.
@@ -23,6 +26,8 @@ class InicioEstudianteScreen extends StatelessWidget {
     this.perfil,
     this.reloj,
     this.deportes,
+    this.resenas,
+    this.uid,
   });
 
   final String nombre;
@@ -40,7 +45,29 @@ class InicioEstudianteScreen extends StatelessWidget {
   /// null, el catálogo usa Firestore.
   final DeporteRepository? deportes;
 
+  /// Reseñas de los deportes. Mientras sea null, el detalle avisa que
+  /// todavía no están disponibles.
+  final ResenaRepository? resenas;
+
+  /// UID del estudiante, para reconocer su propia reseña.
+  final String? uid;
+
   static const indiceExplorar = 1;
+
+  /// Abre el detalle del deporte elegido en el catálogo.
+  void _verDeporte(BuildContext context, Deporte deporte) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DetalleDeporteScreen(
+          deporte: deporte,
+          deportes: deportes,
+          resenas: resenas,
+          estudianteUid: uid,
+          estudianteNombre: nombre,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +101,10 @@ class InicioEstudianteScreen extends StatelessWidget {
           etiqueta: 'Explorar',
           icono: Icons.search,
           iconoSeleccionado: Icons.search,
-          pantalla: CatalogoScreen(repositorio: deportes),
+          pantalla: CatalogoScreen(
+            repositorio: deportes,
+            onVerDeporte: (deporte) => _verDeporte(context, deporte),
+          ),
         ),
         const DestinoNavegacion(
           etiqueta: 'Mis deportes',
