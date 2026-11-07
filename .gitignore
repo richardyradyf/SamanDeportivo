@@ -49,3 +49,6 @@ app.*.map.json
 
 # Node.js
 node_modules/
+
+# Caché de Firebase Hosting
+.firebase/
