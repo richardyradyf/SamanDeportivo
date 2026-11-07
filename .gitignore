@@ -49,3 +49,5 @@ app.*.map.json
 
 # Node.js
 node_modules/
+
+functions/.secret.local
