@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:saman_deportivo/core/theme/app_theme.dart';
@@ -153,17 +151,17 @@ void main() {
     });
 
     testWidgets('los cupos se actualizan en tiempo real', (tester) async {
-      final cambios = StreamController<Deporte?>();
-      addTearDown(cambios.close);
-
+      // La pantalla se abre con el deporte del catálogo (0 ocupados) y
+      // luego Firestore entrega la versión nueva (5 ocupados).
       await _mostrar(
         tester,
         DetalleDeporteScreen(
           deporte: _futbol(),
-          deportes: _DeportesFalsos(uno: cambios.stream),
+          deportes: _DeportesFalsos(
+            uno: Stream.value(_futbol(cuposOcupados: 5)),
+          ),
         ),
       );
-      cambios.add(_futbol(cuposOcupados: 5));
       await tester.pump();
 
       expect(find.text('5 de 20 cupos ocupados'), findsOneWidget);
@@ -206,17 +204,14 @@ void main() {
     });
 
     testWidgets('si el deporte se desactiva lo avisa', (tester) async {
-      final cambios = StreamController<Deporte?>();
-      addTearDown(cambios.close);
-
+      // Firestore deja de entregar el deporte (null).
       await _mostrar(
         tester,
         DetalleDeporteScreen(
           deporte: _futbol(),
-          deportes: _DeportesFalsos(uno: cambios.stream),
+          deportes: _DeportesFalsos(uno: Stream.value(null)),
         ),
       );
-      cambios.add(null);
       await tester.pump();
 
       expect(find.text('Este deporte ya no está disponible.'), findsOneWidget);
