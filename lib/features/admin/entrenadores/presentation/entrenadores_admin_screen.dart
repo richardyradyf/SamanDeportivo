@@ -1,6 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:saman_deportivo/features/admin/entrenadores/data/firebase_entrenador_provisioner.dart';
+import 'package:saman_deportivo/features/admin/entrenadores/data/spark_entrenador_provisioner.dart';
 
 import 'crear_entrenador_dialog.dart';
 
@@ -11,8 +11,8 @@ import 'package:saman_deportivo/models/entrenador.dart';
 
 /// Directorio administrativo de entrenadores existentes.
 ///
-/// No crea usuarios de Firebase Authentication desde el cliente.
-/// La provisión de cuentas requiere un backend con privilegios y auditoría.
+/// En Spark el administrador aprovisiona mediante Auth secundaria y reglas
+/// de escritura para crear el perfil y el índice de cédula atómicamente.
 class EntrenadoresAdminScreen extends StatefulWidget {
   const EntrenadoresAdminScreen({super.key, this.repositorio});
 
@@ -74,7 +74,7 @@ class _EntrenadoresAdminScreenState extends State<EntrenadoresAdminScreen> {
                 onPressed: () => showDialog<void>(
                   context: context,
                   builder: (_) => CrearEntrenadorDialog(
-                    crear: FirebaseEntrenadorProvisioner().crear,
+                    crear: SparkEntrenadorProvisioner().crear,
                   ),
                 ),
                 icon: const Icon(Icons.person_add_alt_1),
@@ -164,6 +164,29 @@ class _EntrenadoresAdminScreenState extends State<EntrenadoresAdminScreen> {
                                           entrenador.correo,
                                           style: tema.textTheme.bodySmall,
                                           overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: TextButton.icon(
+                                            key: Key('reenviar-invitacion-${entrenador.uid}'),
+                                            onPressed: () async {
+                                              try {
+                                                await SparkEntrenadorProvisioner()
+                                                    .reenviarInvitacion(entrenador.correo);
+                                                if (!context.mounted) return;
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Invitación solicitada por correo.')),
+                                                );
+                                              } catch (_) {
+                                                if (!context.mounted) return;
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('No se pudo reenviar la invitación.')),
+                                                );
+                                              }
+                                            },
+                                            icon: const Icon(Icons.mail_outline),
+                                            label: const Text('Reenviar invitación'),
+                                          ),
                                         ),
                                       ],
                                     ),

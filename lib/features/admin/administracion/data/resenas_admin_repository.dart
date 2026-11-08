@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:saman_deportivo/models/deporte.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/data/firestore_resena_repository.dart';
 import 'package:saman_deportivo/models/resena.dart';
 
 /// Las reseñas se consultan por deporte: evita una consulta de colección
@@ -51,12 +52,10 @@ class FirestoreResenasAdminRepository implements ResenasAdminRepository {
     if (codigoDeporte.trim().isEmpty || estudianteUid.trim().isEmpty) {
       throw ArgumentError('Deporte y estudiante son obligatorios.');
     }
-    // Mantiene comentario y puntuación originales; solo cambia visibilidad.
-    await _firestore
-        .collection('deportes')
-        .doc(codigoDeporte)
-        .collection('resenas')
-        .doc(estudianteUid)
-        .update({'oculta': oculta});
+    // Reusar la transaccion compartida: oculta la resena y actualiza
+    // promedio/total sin dejar los dos documentos inconsistentes.
+    await FirestoreResenaRepository(firestore: _firestore).cambiarVisibilidad(
+      codigoDeporte, estudianteUid, oculta: oculta,
+    );
   }
 }

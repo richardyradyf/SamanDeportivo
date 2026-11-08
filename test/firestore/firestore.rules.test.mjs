@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, writeBatch, serverTimestamp } from 'firebase/firestore';
 
 let env;
 const datosA = {
@@ -295,6 +295,9 @@ async function sembrarResenaA3(codigo = 'FUT-81') {
       comentario: 'Buen entrenamiento', oculta: false,
       fecha: new Date('2026-11-06T12:00:00Z'),
     });
+    await updateDoc(doc(ctx.firestore(), 'deportes', codigo), {
+      promedioCalificacion: 5, totalResenas: 1,
+    });
   });
 }
 
@@ -337,8 +340,24 @@ test('A3.2: estudiante no puede consultar reseñas administrativas', async () =>
 });
 
 test('A3.2: administrador puede ocultar y volver a mostrar una reseña', async () => {
-  await assertSucceeds(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: true }));
-  await assertSucceeds(updateDoc(doc(admin(), 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: false }));
+  await sembrarResenaA3('FUT-81');
+  const db = admin();
+  const ocultar = writeBatch(db);
+  ocultar.update(doc(db, 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: true });
+  ocultar.update(doc(db, 'deportes', 'FUT-81'), { promedioCalificacion: 0, totalResenas: 0 });
+  ocultar.set(doc(db, 'control', 'resenas'), {
+    version: 1, codigoDeporte: 'FUT-81', estudianteUid: 'uid-a',
+    adminUid: 'uid-admin', actualizadoEn: serverTimestamp(),
+  });
+  await assertSucceeds(ocultar.commit());
+  const mostrar = writeBatch(db);
+  mostrar.update(doc(db, 'deportes', 'FUT-81', 'resenas', 'uid-a'), { oculta: false });
+  mostrar.update(doc(db, 'deportes', 'FUT-81'), { promedioCalificacion: 5, totalResenas: 1 });
+  mostrar.set(doc(db, 'control', 'resenas'), {
+    version: 2, codigoDeporte: 'FUT-81', estudianteUid: 'uid-a',
+    adminUid: 'uid-admin', actualizadoEn: serverTimestamp(),
+  });
+  await assertSucceeds(mostrar.commit());
 });
 
 test('A3.2: administrador no puede alterar puntuación ni comentario', async () => {
@@ -436,6 +455,11 @@ async function sembrarRevisionA36(codigo, uid = 'uid-a', oculta = false) {
       estudianteNombre: 'Estudiante Uno', puntuacion: 4,
       comentario: 'Clase de prueba', oculta, fecha: new Date(),
     });
+    if (!oculta) {
+      await updateDoc(doc(ctx.firestore(), 'deportes', codigo), {
+        promedioCalificacion: 4, totalResenas: 1,
+      });
+    }
   });
 }
 
@@ -489,7 +513,13 @@ test('A3.6: visitante no puede listar reseñas sin filtrar', async () => {
 test('A3.6: alumno con inscripción confirmada crea su reseña', async () => {
   await sembrarDeporteA1('REV-04');
   await sembrarInscripcionA36('REV-04');
-  await assertSucceeds(setDoc(doc(estudiante(), 'deportes', 'REV-04', 'resenas', 'uid-a'), revisionA36()));
+  const db = estudiante();
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'deportes', 'REV-04', 'resenas', 'uid-a'), revisionA36());
+  lote.update(doc(db, 'deportes', 'REV-04'), {
+    promedioCalificacion: 5, totalResenas: 1,
+  });
+  await assertSucceeds(lote.commit());
 });
 
 test('A3.6: alumno con inscripción pendiente no puede reseñar', async () => {
@@ -534,9 +564,15 @@ test('A3.6: alumno no puede crear comentario excesivo', async () => {
 test('A3.6: alumno confirmado modifica su comentario', async () => {
   await sembrarRevisionA36('REV-11');
   await sembrarInscripcionA36('REV-11');
-  await assertSucceeds(updateDoc(doc(estudiante(), 'deportes', 'REV-11', 'resenas', 'uid-a'), {
+  const db = estudiante();
+  const lote = writeBatch(db);
+  lote.update(doc(db, 'deportes', 'REV-11', 'resenas', 'uid-a'), {
     comentario: 'Comentario corregido', puntuacion: 3,
-  }));
+  });
+  lote.update(doc(db, 'deportes', 'REV-11'), {
+    promedioCalificacion: 3, totalResenas: 1,
+  });
+  await assertSucceeds(lote.commit());
 });
 
 test('A3.6: alumno no puede cambiar oculta', async () => {
@@ -669,3 +705,187 @@ for (const nombre of ['inscripciones', 'pagos']) {
     }));
   });
 }
+
+// Spark A2: la identidad Auth se crea en Auth secundario, pero las reglas
+// requieren el perfil y el índice de cédula en el mismo commit de Firestore.
+const datosCoachSpark = (cedula='20666333') => ({
+  nombre:'Entrenador Spark',correo:'coach.spark@unimet.edu.ve',
+  cedula, rol:'entrenador', especialidad:'Atletismo',aniosExperiencia:3,
+});
+
+test('Spark A2: admin crea entrenador e índice de cédula atómicamente', async () => {
+  const db=admin();
+  const lote=writeBatch(db);
+  lote.set(doc(db,'usuarios','spark-coach-ok'),datosCoachSpark());
+  lote.set(doc(db,'cedulas','20666333'),{uid:'spark-coach-ok'});
+  await assertSucceeds(lote.commit());
+});
+test('Spark A2: admin no crea entrenador sin índice de cédula', async () => {
+  await assertFails(setDoc(doc(admin(),'usuarios','spark-sin-indice'),datosCoachSpark('20666334')));
+});
+test('Spark A2: admin no crea índice sin perfil', async () => {
+  await assertFails(setDoc(doc(admin(),'cedulas','20666335'),{uid:'spark-sin-perfil'}));
+});
+test('Spark A2: admin no crea un perfil con rol administrador', async () => {
+  const db=admin();const lote=writeBatch(db);
+  lote.set(doc(db,'usuarios','spark-coach-fraude'),{...datosCoachSpark('20666336'),rol:'administrador'});
+  lote.set(doc(db,'cedulas','20666336'),{uid:'spark-coach-fraude'});
+  await assertFails(lote.commit());
+});
+test('Spark A2: estudiante no crea entrenador ni índice', async () => {
+  const db=estudiante();const lote=writeBatch(db);
+  lote.set(doc(db,'usuarios','spark-coach-ajeno'),datosCoachSpark('20666337'));
+  lote.set(doc(db,'cedulas','20666337'),{uid:'spark-coach-ajeno'});
+  await assertFails(lote.commit());
+});
+test('Spark A2: admin no falsifica relación índice-perfil', async () => {
+  const db=admin();const lote=writeBatch(db);
+  lote.set(doc(db,'usuarios','spark-coach-mismatch'),datosCoachSpark('20666338'));
+  lote.set(doc(db,'cedulas','20666338'),{uid:'otro-uid'});
+  await assertFails(lote.commit());
+});
+test('Spark A2: el índice de cédula no se modifica', async () => {
+  await assertFails(updateDoc(doc(admin(),'cedulas','20666333'),{uid:'otro-uid'}));
+});
+test('Spark A2: estudiante no consulta índices de cédula', async () => {
+  await assertFails(getDoc(doc(estudiante(),'cedulas','20666333')));
+});
+test('Spark A2: administrador consulta índice de cédula', async () => {
+  await assertSucceeds(getDoc(doc(admin(),'cedulas','20666333')));
+});
+
+// SPARK_PASO2_TESTS: regresiones de operaciones atomicas de reseñas y agenda.
+
+test('Spark: resena nueva NO puede guardar solo el documento de reseña', async () => {
+  await sembrarDeporteA1('REV-21');
+  await sembrarInscripcionA36('REV-21');
+  await assertFails(setDoc(doc(estudiante(), 'deportes', 'REV-21', 'resenas', 'uid-a'), revisionA36()));
+});
+
+test('Spark: no se puede inflar el agregado aun creando una reseña', async () => {
+  await sembrarDeporteA1('REV-22');
+  await sembrarInscripcionA36('REV-22');
+  const db = estudiante();
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'deportes', 'REV-22', 'resenas', 'uid-a'), revisionA36());
+  lote.update(doc(db, 'deportes', 'REV-22'), {
+    promedioCalificacion: 5, totalResenas: 999,
+  });
+  await assertFails(lote.commit());
+});
+
+test('Spark: admin no puede actualizar agenda sin avanzar control/agenda', async () => {
+  await sembrarDeporteA1('AGE-21');
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'AGE-21'), {
+    horarios: [{ dia: 'lunes', horaInicio: '16:00', horaFin: '18:00', lugar: 'Cancha' }],
+    dias: ['lunes'],
+    actualizadoEn: new Date(),
+  }));
+});
+
+test('Spark: admin actualiza agenda y version en el mismo lote', async () => {
+  await sembrarDeporteA1('AGE-22');
+  const db = admin();
+  const lote = writeBatch(db);
+  lote.update(doc(db, 'deportes', 'AGE-22'), {
+    horarios: [{ dia: 'lunes', horaInicio: '16:00', horaFin: '18:00', lugar: 'Cancha' }],
+    dias: ['lunes'],
+    actualizadoEn: serverTimestamp(),
+  });
+  lote.set(doc(db, 'control', 'agenda'), {
+    version: 1, codigoDeporte: 'AGE-22', adminUid: 'uid-admin',
+    actualizadoEn: serverTimestamp(),
+  });
+  await assertSucceeds(lote.commit());
+});
+
+test('Spark: estudiante nunca puede modificar control de agenda', async () => {
+  await assertFails(setDoc(doc(estudiante(), 'control', 'agenda'), {
+    version: 20, codigoDeporte: 'AGE-22', adminUid: 'uid-a',
+    actualizadoEn: serverTimestamp(),
+  }));
+});
+
+
+// AUDITORIA SPARK PASO 3: permisos del agregado y control de moderacion.
+test('Spark P3: administrador no puede falsificar promedio del deporte', async () => {
+  await sembrarDeporteA1('REV-31');
+  await assertFails(updateDoc(doc(admin(), 'deportes', 'REV-31'), {
+    promedioCalificacion: 5, totalResenas: 900,
+  }));
+});
+
+test('Spark P3: administrador no puede moderar sin marca atomica', async () => {
+  await sembrarDeporteA1('REV-32', {
+    promedioCalificacion: 4, totalResenas: 1,
+  });
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'deportes', 'REV-32', 'resenas', 'uid-a'), {
+      ...revisionA36(), puntuacion: 4,
+    });
+  });
+  const db = admin();
+  const lote = writeBatch(db);
+  lote.update(doc(db, 'deportes', 'REV-32', 'resenas', 'uid-a'), {oculta: true});
+  lote.update(doc(db, 'deportes', 'REV-32'), {promedioCalificacion: 0, totalResenas: 0});
+  await assertFails(lote.commit());
+});
+
+test('Spark P3: marca sin cambio real de reseña no autoriza agregado', async () => {
+  await sembrarDeporteA1('REV-33', {
+    promedioCalificacion: 4, totalResenas: 1,
+  });
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'deportes', 'REV-33', 'resenas', 'uid-a'), {
+      ...revisionA36(), puntuacion: 4,
+    });
+  });
+  const db = admin();
+  const lote = writeBatch(db);
+  lote.update(doc(db, 'deportes', 'REV-33'), {promedioCalificacion: 5, totalResenas: 50});
+  lote.set(doc(db, 'control', 'resenas'), {
+    version: 3, codigoDeporte: 'REV-33', estudianteUid: 'uid-a',
+    adminUid: 'uid-admin', actualizadoEn: serverTimestamp(),
+  });
+  await assertFails(lote.commit());
+});
+
+test('Spark P3: control/resenas rechaza reusar version antigua', async () => {
+  const db = admin();
+  await assertFails(updateDoc(doc(db, 'control', 'resenas'), {
+    version: 1,
+  }));
+});
+
+test('Spark P3: reseña nueva con agregado correcto se confirma', async () => {
+  await sembrarDeporteA1('REV-34');
+  await sembrarInscripcionA36('REV-34');
+  const db = estudiante();
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'deportes', 'REV-34', 'resenas', 'uid-a'), revisionA36());
+  lote.update(doc(db, 'deportes', 'REV-34'), {
+    promedioCalificacion: 5, totalResenas: 1,
+  });
+  await assertSucceeds(lote.commit());
+  const foto = await getDoc(doc(db, 'deportes', 'REV-34'));
+  if (foto.data().totalResenas !== 1 || foto.data().promedioCalificacion !== 5) {
+    throw new Error('Reseña y agregado quedaron inconsistentes.');
+  }
+});
+
+test('Spark P3: control de agenda no admite version repetida', async () => {
+  await sembrarDeporteA1('AGE-31');
+  const db = admin();
+  const actual = await getDoc(doc(db, 'control', 'agenda'));
+  const version = actual.exists() ? actual.data().version : 0;
+  const lote = writeBatch(db);
+  lote.update(doc(db, 'deportes', 'AGE-31'), {
+    horarios: [{dia:'lunes',horaInicio:'12:00',horaFin:'13:00',lugar:'Cancha'}],
+    dias:['lunes'],actualizadoEn: serverTimestamp(),
+  });
+  lote.set(doc(db, 'control', 'agenda'), {
+    version, codigoDeporte:'AGE-31', adminUid:'uid-admin',
+    actualizadoEn:serverTimestamp(),
+  });
+  await assertFails(lote.commit());
+});

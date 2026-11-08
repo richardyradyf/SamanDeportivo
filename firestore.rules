@@ -45,6 +45,22 @@ service cloud.firestore {
     }
 
 
+    // Spark: solo el administrador crea entrenadores. La otra escritura
+    // (cedulas/{cedula}) debe existir en el mismo commit atómico.
+    function nuevoEntrenadorAdminValido(uid) {
+      let d = request.resource.data;
+      return esAdministrador()
+        && d.keys().hasAll(['nombre','correo','cedula','rol','especialidad','aniosExperiencia'])
+        && d.keys().hasOnly(['nombre','correo','cedula','rol','especialidad','aniosExperiencia'])
+        && d.rol == 'entrenador'
+        && d.nombre is string && d.nombre.size() >= 3 && d.nombre.size() <= 100
+        && d.correo is string && d.correo.size() <= 150
+        && d.cedula is string && d.cedula.matches('^[0-9]{5,20}$')
+        && d.especialidad is string && d.especialidad.size() >= 2 && d.especialidad.size() <= 100
+        && d.aniosExperiencia is int && d.aniosExperiencia >= 0 && d.aniosExperiencia <= 60
+        && getAfter(/databases/$(database)/documents/cedulas/$(d.cedula)).data.uid == uid;
+    }
+
     function edicionPropiaValida() {
       let cambiados = request.resource.data.diff(resource.data).affectedKeys();
       return resource.data.rol in ['estudiante', 'entrenador', 'administrador']
@@ -58,12 +74,25 @@ service cloud.firestore {
             && request.resource.data.carnet.matches('^[a-zA-Z0-9-]{4,24}$')));
     }
 
+    // Índice de cédulas: alta única, solo administrador, con perfil asociado.
+    match /cedulas/{cedula} {
+      allow get: if esAdministrador();
+      allow list: if false;
+      allow create: if esAdministrador()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.keys().hasAll(['uid'])
+        && request.resource.data.uid is string
+        && getAfter(/databases/$(database)/documents/usuarios/$(request.resource.data.uid)).data.cedula == cedula
+        && getAfter(/databases/$(database)/documents/usuarios/$(request.resource.data.uid)).data.rol == 'entrenador';
+      allow update, delete: if false;
+    }
+
     match /usuarios/{uid} {
       allow get: if esPropietario(uid) || esAdministrador();
       allow list: if esAdministrador();
       // Solo estudiantes pueden auto-registrarse. El administrador y el
       // entrenador se aprovisionan de manera privilegiada (Firebase Console).
-      allow create: if nuevoEstudianteValido(uid);
+      allow create: if nuevoEstudianteValido(uid) || nuevoEntrenadorAdminValido(uid);
       // Ni siquiera el admin puede promover roles desde el cliente.
       allow update: if (esPropietario(uid) && edicionPropiaValida())
         || (esAdministrador()
@@ -172,7 +201,193 @@ service cloud.firestore {
         && d.fecha <= request.time + duration.value(10, 'm');
     }
 
-    // A2.3 — Agenda protegida por Cloud Functions
+    // A2 Spark — Agenda respaldada por transacciones de cliente y control/agenda
+
+    // SPARK_PASO2_AGENDA_RESENAS_V1. Las escrituras relacionadas se validan
+    // atomicamente mediante getAfter() y cambios restringidos por campo.
+    function rutaDeporte(codigo) {
+      return /databases/$(database)/documents/deportes/$(codigo);
+    }
+
+    function rutaResena(codigo, uid) {
+      return /databases/$(database)/documents/deportes/$(codigo)/resenas/$(uid);
+    }
+
+    function rutaControlAgenda() {
+      return /databases/$(database)/documents/control/agenda;
+    }
+
+    function promedioCercano(valor, esperado) {
+      return valor is number
+        && valor >= esperado - 0.000001
+        && valor <= esperado + 0.000001;
+    }
+
+    // En la misma transaccion, crear una resena visible incrementa el total.
+    function agregadoNuevaResena(codigo, puntos) {
+      let antes = get(rutaDeporte(codigo)).data;
+      let despues = getAfter(rutaDeporte(codigo)).data;
+      return despues.totalResenas == antes.totalResenas + 1
+        && promedioCercano(
+          despues.promedioCalificacion,
+          (antes.promedioCalificacion * antes.totalResenas + puntos)
+            / (antes.totalResenas + 1)
+        );
+    }
+
+    // Editar la puntuacion de una resena visible conserva el total.
+    function agregadoEditarResena(codigo, anterior, nuevo) {
+      let antes = get(rutaDeporte(codigo)).data;
+      let despues = getAfter(rutaDeporte(codigo)).data;
+      return antes.totalResenas > 0
+        && despues.totalResenas == antes.totalResenas
+        && promedioCercano(
+          despues.promedioCalificacion,
+          (antes.promedioCalificacion * antes.totalResenas - anterior + nuevo)
+            / antes.totalResenas
+        );
+    }
+
+    // Ocultar o mostrar requiere que el administrador ajuste el agregado.
+    function agregadoVisibilidadResena(codigo, puntos, ocultar) {
+      let antes = get(rutaDeporte(codigo)).data;
+      let despues = getAfter(rutaDeporte(codigo)).data;
+      return ocultar
+        ? (antes.totalResenas > 0
+          && despues.totalResenas == antes.totalResenas - 1
+          && promedioCercano(
+            despues.promedioCalificacion,
+            antes.totalResenas == 1 ? 0 :
+              (antes.promedioCalificacion * antes.totalResenas - puntos)
+                / (antes.totalResenas - 1)
+          ))
+        : (despues.totalResenas == antes.totalResenas + 1
+          && promedioCercano(
+            despues.promedioCalificacion,
+            (antes.promedioCalificacion * antes.totalResenas + puntos)
+              / (antes.totalResenas + 1)
+          ));
+    }
+
+    // En el update de deportes, un estudiante solo puede ajustar el agregado
+    // si SU resena cambia en este mismo commit y la cuenta es consistente.
+    function agregadoEstudianteAutorizado(codigo) {
+      let ruta = rutaResena(codigo, request.auth.uid);
+      let antes = resource.data;
+      let despues = request.resource.data;
+      return autenticado()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['promedioCalificacion', 'totalResenas'])
+        && existsAfter(ruta)
+        && (
+          (!exists(ruta)
+            && getAfter(ruta).data.oculta == false
+            && despues.totalResenas == antes.totalResenas + 1
+            && promedioCercano(
+              despues.promedioCalificacion,
+              (antes.promedioCalificacion * antes.totalResenas
+                + getAfter(ruta).data.puntuacion)
+                  / (antes.totalResenas + 1)
+            ))
+          || (exists(ruta)
+            && get(ruta).data.oculta == false
+            && getAfter(ruta).data.oculta == false
+            && getAfter(ruta).data.puntuacion != get(ruta).data.puntuacion
+            && antes.totalResenas > 0
+            && despues.totalResenas == antes.totalResenas
+            && promedioCercano(
+              despues.promedioCalificacion,
+              (antes.promedioCalificacion * antes.totalResenas
+                - get(ruta).data.puntuacion
+                + getAfter(ruta).data.puntuacion) / antes.totalResenas
+            ))
+        );
+    }
+
+    // Spark A3: una marca atomica permite identificar la reseña que un
+    // administrador modera. Sin esta marca, no se autoriza editar el agregado.
+    // Es un unico documento global: adecuado para escala academica reducida.
+    function rutaControlResenas() {
+      return /databases/$(database)/documents/control/resenas;
+    }
+
+    function moderacionConControl(codigo) {
+      let marca = rutaControlResenas();
+      let uid = getAfter(marca).data.estudianteUid;
+      let resena = rutaResena(codigo, uid);
+      return existsAfter(marca)
+        && getAfter(marca).data.codigoDeporte == codigo
+        && getAfter(marca).data.adminUid == request.auth.uid
+        && getAfter(marca).data.actualizadoEn == request.time
+        && getAfter(marca).data.version ==
+          (exists(marca) ? get(marca).data.version : 0) + 1
+        && exists(resena) && existsAfter(resena)
+        && get(resena).data.oculta != getAfter(resena).data.oculta
+        && get(resena).data.puntuacion == getAfter(resena).data.puntuacion
+        && agregadoVisibilidadResena(
+          codigo,
+          get(resena).data.puntuacion,
+          getAfter(resena).data.oculta
+        );
+    }
+
+    function controlResenasValido() {
+      let d = request.resource.data;
+      let resena = rutaResena(d.codigoDeporte, d.estudianteUid);
+      return d.keys().hasAll([
+          'version', 'codigoDeporte', 'estudianteUid',
+          'adminUid', 'actualizadoEn'
+        ])
+        && d.keys().hasOnly([
+          'version', 'codigoDeporte', 'estudianteUid',
+          'adminUid', 'actualizadoEn'
+        ])
+        && d.version is int && d.version >= 1
+        && d.codigoDeporte is string
+        && d.codigoDeporte.matches('^[A-Z]{3}-[0-9]{2}$')
+        && d.estudianteUid is string
+        && d.estudianteUid.size() > 0 && d.estudianteUid.size() <= 128
+        && d.adminUid == request.auth.uid
+        && d.actualizadoEn == request.time
+        && exists(resena) && existsAfter(resena)
+        && get(resena).data.oculta != getAfter(resena).data.oculta
+        && get(resena).data.puntuacion == getAfter(resena).data.puntuacion
+        && agregadoVisibilidadResena(
+          d.codigoDeporte,
+          get(resena).data.puntuacion,
+          getAfter(resena).data.oculta
+        );
+    }
+
+    // Version global de agenda; impide confirmar dos asignaciones basadas
+    // en el mismo estado cuando trabajan administradores simultaneamente.
+    function agendaConControl(codigo) {
+      let ruta = rutaControlAgenda();
+      return existsAfter(ruta)
+        && getAfter(ruta).data.codigoDeporte == codigo
+        && getAfter(ruta).data.adminUid == request.auth.uid
+        && getAfter(ruta).data.actualizadoEn == request.time
+        && getAfter(ruta).data.version ==
+          (exists(ruta) ? get(ruta).data.version : 0) + 1;
+    }
+
+    function controlAgendaValido() {
+      let d = request.resource.data;
+      return d.keys().hasAll([
+          'version', 'codigoDeporte', 'adminUid', 'actualizadoEn'
+        ])
+        && d.keys().hasOnly([
+          'version', 'codigoDeporte', 'adminUid', 'actualizadoEn'
+        ])
+        && d.version is int && d.version >= 1
+        && d.codigoDeporte is string
+        && d.codigoDeporte.matches('^[A-Z]{3}-[0-9]{2}$')
+        && d.adminUid == request.auth.uid
+        && d.actualizadoEn == request.time
+        && exists(rutaDeporte(d.codigoDeporte))
+        && getAfter(rutaDeporte(d.codigoDeporte)).data.actualizadoEn == request.time;
+    }
+
     match /deportes/{codigo} {
       // La lectura del catalogo es publica (RF-05). No incluir datos privados.
       allow get, list: if true;
@@ -185,22 +400,36 @@ service cloud.firestore {
         && request.resource.data.promedioCalificacion == 0
         && request.resource.data.totalResenas == 0
         && request.resource.data.actualizadoEn == null
-        // A2.3: la asignación inicial también pasa por callable.
+        // A2 Spark: la asignacion inicial pasa por la transaccion de agenda.
         && request.resource.data.entrenadorUid == null
         && request.resource.data.entrenadorNombre == null
         && request.resource.data.entrenadorEspecialidad == null
         && request.resource.data.horarios.size() == 0
         && request.resource.data.dias.size() == 0;
 
-      // La administracion NO puede falsificar contadores/codigos/fechas.
-      // Mariana definira por separado las transacciones protegidas para cupos.
-      allow update: if esAdministrador()
-        && datosDeporteValidos(codigo)
-        && request.resource.data.actualizadoEn is timestamp
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'nombre', 'descripcion', 'disciplina', 'costo', 'imagenUrl',
-          'cupoMaximo', 'activo', 'actualizadoEn'
-        ]);
+      // Edicion comercial normal, agenda serializada o agregado de resenas.
+      // Ningun estudiante puede alterar cupos ni los atributos comerciales.
+      allow update: if datosDeporteValidos(codigo) && (
+        (esAdministrador()
+          && request.resource.data.actualizadoEn is timestamp
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'nombre', 'descripcion', 'disciplina', 'costo', 'imagenUrl',
+            'cupoMaximo', 'activo', 'actualizadoEn'
+          ]))
+        || (esAdministrador()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'entrenadorUid', 'entrenadorNombre', 'entrenadorEspecialidad',
+            'horarios', 'dias', 'actualizadoEn'
+          ])
+          && request.resource.data.actualizadoEn == request.time
+          && agendaConControl(codigo))
+        || (esAdministrador()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'promedioCalificacion', 'totalResenas'
+          ])
+          && moderacionConControl(codigo))
+        || agregadoEstudianteAutorizado(codigo)
+      );
 
       allow delete: if false;
 
@@ -210,13 +439,13 @@ service cloud.firestore {
         allow get, list: if esAdministrador()
           || resource.data.oculta == false;
 
-        // ID del documento = UID autenticado, inscripción confirmada.
-        // Los estudiantes nunca eligen la visibilidad de su reseña.
+        // ID de documento = UID del autor. Una resena nueva se guarda con
+        // incremento del promedio en la MISMA operacion atomica.
         allow create: if puedeResenar(estudianteUid, codigo)
           && resenaValida(request.resource.data)
-          && request.resource.data.oculta == false;
+          && request.resource.data.oculta == false
+          && agregadoNuevaResena(codigo, request.resource.data.puntuacion);
 
-        // El estudiante solo edita sus datos de reseña, nunca 'oculta'.
         allow update: if (
             puedeResenar(estudianteUid, codigo)
             && resenaValida(request.resource.data)
@@ -224,10 +453,20 @@ service cloud.firestore {
               'estudianteNombre', 'puntuacion', 'comentario', 'fecha'
             ])
             && request.resource.data.oculta == resource.data.oculta
+            // Si la nota cambia y la resena es visible, la media tambien.
+            && (resource.data.oculta == true
+              || request.resource.data.puntuacion == resource.data.puntuacion
+              || agregadoEditarResena(
+                codigo, resource.data.puntuacion, request.resource.data.puntuacion
+              ))
           ) || (
             esAdministrador()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['oculta'])
             && request.resource.data.oculta is bool
+            && request.resource.data.oculta != resource.data.oculta
+            && agregadoVisibilidadResena(
+              codigo, resource.data.puntuacion, request.resource.data.oculta
+            )
           );
         allow delete: if false;
       }
@@ -249,6 +488,35 @@ service cloud.firestore {
       allow get, list: if esAdministrador()
         || (autenticado() && resource.data.estudianteUid == request.auth.uid);
       allow create, update, delete: if false;
+    }
+
+    // A2 Spark: un unico contador global para serializar agendas.
+    match /control/{controlId} {
+      allow get: if controlId in ['agenda', 'resenas'] && esAdministrador();
+      allow list: if false;
+      allow create: if (
+          controlId == 'agenda'
+          && esAdministrador()
+          && controlAgendaValido()
+          && request.resource.data.version == 1
+        ) || (
+          controlId == 'resenas'
+          && esAdministrador()
+          && controlResenasValido()
+          && request.resource.data.version == 1
+        );
+      allow update: if (
+          controlId == 'agenda'
+          && esAdministrador()
+          && controlAgendaValido()
+          && request.resource.data.version == resource.data.version + 1
+        ) || (
+          controlId == 'resenas'
+          && esAdministrador()
+          && controlResenasValido()
+          && request.resource.data.version == resource.data.version + 1
+        );
+      allow delete: if false;
     }
 
     match /busquedas/{busquedaId} {

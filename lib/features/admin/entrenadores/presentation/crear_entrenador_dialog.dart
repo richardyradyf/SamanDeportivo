@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Crea la cuenta Auth a través de una callable. No utiliza Firebase Admin SDK
-/// desde Flutter ni asigna el rol directamente en Firestore.
+/// Crea la cuenta con una segunda app de Firebase, preservando la sesión
+/// del administrador. El servidor de Auth envía la recuperación de contraseña.
 class CrearEntrenadorDialog extends StatefulWidget {
   const CrearEntrenadorDialog({super.key, required this.crear});
 
@@ -85,7 +85,7 @@ class _CrearEntrenadorDialogState extends State<CrearEntrenadorDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Cuenta creada. Comparte la invitación por un canal privado; no se envió un correo automáticamente.',
+                      'Cuenta creada. Se solicitó el envío de un correo para establecer la contraseña. Si no llega, utiliza «Reenviar invitación» o «Recuperar contraseña».',
                     ),
                     if (_enlace != null) ...[
                       const SizedBox(height: 12),
@@ -103,7 +103,7 @@ class _CrearEntrenadorDialogState extends State<CrearEntrenadorDialog> {
                       const Padding(
                         padding: EdgeInsets.only(top: 12),
                         child: Text(
-                          'No se generó enlace. El entrenador puede usar «Recuperar contraseña».',
+                          'No se muestra un enlace de invitación al administrador. Si el correo no llega, usa «Reenviar invitación» o «Recuperar contraseña».',
                         ),
                       ),
                   ],

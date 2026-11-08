@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/data/agregado_resenas.dart';
 import 'package:saman_deportivo/models/conversiones.dart';
 import 'package:saman_deportivo/models/resena.dart';
@@ -15,10 +16,12 @@ import 'package:saman_deportivo/repositories/resena_repository.dart';
 ///   recalculan aquí, en la misma transacción que guarda la reseña. Las
 ///   reseñas ocultas no cuentan. La cuenta está en [AgregadoResenas].
 class FirestoreResenaRepository implements ResenaRepository {
-  FirestoreResenaRepository({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  FirestoreResenaRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
 
   /// Límite de `estudianteNombre` en las reglas.
   static const int maxNombre = 100;
@@ -118,13 +121,20 @@ class FirestoreResenaRepository implements ResenaRepository {
     String estudianteUid, {
     required bool oculta,
   }) async {
+    final administradorUid = _auth.currentUser?.uid;
+    if (administradorUid == null) {
+      throw StateError('Inicia sesión como administrador para moderar reseñas.');
+    }
     final deporte = _deporte(codigoDeporte);
     final documento = _resenas(codigoDeporte).doc(estudianteUid);
+    final control = _firestore.collection('control').doc('resenas');
 
-    // Ocultar una reseña la saca del promedio; mostrarla la vuelve a sumar.
+    // Tres documentos en la MISMA transacción: reseña, promedio y marca
+    // de moderación. Las reglas comprueban matemáticamente el cambio.
     await _firestore.runTransaction((transaccion) async {
       final fotoDeporte = await transaccion.get(deporte);
       final fotoResena = await transaccion.get(documento);
+      final fotoControl = await transaccion.get(control);
       final datosDeporte = fotoDeporte.data();
       final datosResena = fotoResena.data();
       if (datosDeporte == null || datosResena == null) {
@@ -132,12 +142,24 @@ class FirestoreResenaRepository implements ResenaRepository {
       }
       if ((datosResena['oculta'] == true) == oculta) return;
 
+      final versionRaw = fotoControl.data()?['version'];
+      if (fotoControl.exists && (versionRaw is! int || versionRaw < 1)) {
+        throw StateError('La versión de moderación es inválida.');
+      }
+      final version = versionRaw is int ? versionRaw : 0;
       final puntuacion = leerEntero(datosResena['puntuacion']);
       final antes = _agregadoDe(datosDeporte);
       final despues = oculta ? antes.quitar(puntuacion) : antes.agregar(puntuacion);
 
       transaccion.update(documento, {'oculta': oculta});
       transaccion.update(deporte, _comoMapa(despues));
+      transaccion.set(control, <String, dynamic>{
+        'version': version + 1,
+        'codigoDeporte': codigoDeporte,
+        'estudianteUid': estudianteUid,
+        'adminUid': administradorUid,
+        'actualizadoEn': FieldValue.serverTimestamp(),
+      });
     });
   }
 }
