@@ -9,6 +9,7 @@ import 'package:saman_deportivo/features/pagos/presentation/pagos_estudiante_sec
 import 'package:saman_deportivo/features/perfil/presentation/perfil_screen.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/persona.dart';
+import 'package:saman_deportivo/features/entrenador/entrenador_firebase.dart';
 
 /// Construye la pestaña "Perfil" para la persona en sesión.
 typedef ConstructorPerfil = Widget Function(
@@ -95,11 +96,14 @@ class AuthGate extends StatelessWidget {
         perfil: construirPerfil(persona, sesion),
         pagos: construirPagos(persona),
       ),
-      Rol.entrenador => InicioEntrenadorScreen(
+            Rol.entrenador => InicioEntrenadorScreen(
         key: llave,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+        estudiantes: NominaFirebase(uid: persona.uid),
+        asistencia: TomarAsistenciaFirebase(uid: persona.uid),
+        historial: HistorialAsistenciaFirebase(uid: persona.uid),
       ),
       Rol.administrador => InicioAdminScreen(
         key: llave,
