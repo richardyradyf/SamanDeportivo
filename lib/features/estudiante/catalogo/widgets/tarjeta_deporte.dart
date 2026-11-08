@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:saman_deportivo/features/estudiante/catalogo/formato_catalogo.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/etiqueta_cupos.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/widgets/imagen_deporte.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
 
@@ -78,10 +79,14 @@ class TarjetaDeporte extends StatelessWidget {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Text(
-                          'Ver disciplina',
-                          style: tema.textTheme.labelLarge?.copyWith(
-                            color: colores.onSurface,
+                        Flexible(
+                          child: Text(
+                            'Ver disciplina',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tema.textTheme.labelLarge?.copyWith(
+                              color: colores.onSurface,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -112,29 +117,7 @@ class _Portada extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colores = Theme.of(context).colorScheme;
-    final respaldo = ColoredBox(
-      color: colores.secondary,
-      child: Center(
-        child: Icon(
-          TarjetaDeporte.iconoDe(deporte.disciplina),
-          size: 40,
-          color: colores.onSecondary,
-        ),
-      ),
-    );
-    final url = deporte.imagenUrl;
-
-    return SizedBox(
-      height: 96,
-      child: url == null || url.isEmpty
-          ? respaldo
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => respaldo,
-            ),
-    );
+    return SizedBox(height: 96, child: ImagenDeporte(deporte: deporte));
   }
 }
 
