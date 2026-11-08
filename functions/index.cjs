@@ -114,3 +114,108 @@ exports.guardarAgendaDeporte = onCall(callableOptions, async (request) => {
     return {ok:true};
   } catch(error) {throw errorNegocio(error);}
 });
+// ===== Pagos con PayPal (Andrés) =====
+const {defineSecret} = require('firebase-functions/params');
+const {Timestamp: TS} = require('firebase-admin/firestore');
+const paypal = require('./lib/paypal.cjs');
+const {validarInscripcionPagable, montoValido, montoCoincide} = require('./lib/pago.cjs');
+
+const PAYPAL_CLIENT_ID = defineSecret('PAYPAL_CLIENT_ID');
+const PAYPAL_CLIENT_SECRET = defineSecret('PAYPAL_CLIENT_SECRET');
+const opcionesPago = {...callableOptions, secrets:[PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET]};
+const URL_RETORNO = 'https://saman-deportivo.web.app/pago_resultado.html';
+const RECHAZOS_PAYPAL = ['INSTRUMENT_DECLINED','TRANSACTION_REFUSED','PAYER_CANNOT_PAY'];
+
+function idValido(valor) {
+  return typeof valor === 'string' && valor.length >= 3 && valor.length <= 200 && !valor.includes('/');
+}
+const tokenPaypal = () => paypal.obtenerToken(PAYPAL_CLIENT_ID.value(), PAYPAL_CLIENT_SECRET.value());
+
+/** Crea la orden en PayPal y el pago pendiente. El monto sale del deporte, nunca de la app. */
+exports.crearOrdenPaypal = onCall(opcionesPago, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated','Inicia sesión.');
+  const inscripcionId = request.data?.inscripcionId;
+  if (!idValido(inscripcionId)) throw new HttpsError('invalid-argument','Inscripción inválida.');
+
+  const inscDoc = await db.collection('inscripciones').doc(inscripcionId).get();
+  if (!inscDoc.exists) throw new HttpsError('not-found','La inscripción no existe.');
+  const insc = inscDoc.data();
+  try {validarInscripcionPagable(insc, uid, new Date());}
+  catch (e) {throw new HttpsError('failed-precondition', e.message);}
+
+  const deporteDoc = await db.collection('deportes').doc(insc.deporteId).get();
+  const costo = deporteDoc.get('costo');
+  if (!deporteDoc.exists || !montoValido(costo)) throw new HttpsError('failed-precondition','El deporte no tiene un costo válido.');
+
+  let orden;
+  try {
+    orden = await paypal.crearOrden(await tokenPaypal(), {
+      inscripcionId,
+      descripcion: `Reserva de cupo: ${insc.deporteNombre}`.slice(0,120),
+      monto: costo,
+      urlRetorno: URL_RETORNO,
+    });
+  } catch (e) {
+    console.error('PayPal crearOrden:', e.message);
+    throw new HttpsError('unavailable','No se pudo conectar con PayPal. Inténtalo de nuevo.');
+  }
+
+  await db.collection('pagos').doc(orden.orderId).set({
+    inscripcionId, estudianteUid:uid, deporteId:insc.deporteId, deporteNombre:insc.deporteNombre,
+    paypalOrderId:orden.orderId, paypalCaptureId:null, monto:costo, moneda:'USD',
+    estado:'pendiente', fecha:FieldValue.serverTimestamp(),
+  });
+  return {pagoId:orden.orderId, urlAprobacion:orden.urlAprobacion};
+});
+
+/** Captura la orden y, solo si PayPal la completó, confirma pago, inscripción y cupo en una transacción. */
+exports.capturarPagoPaypal = onCall(opcionesPago, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated','Inicia sesión.');
+  const pagoId = request.data?.pagoId;
+  if (!idValido(pagoId)) throw new HttpsError('invalid-argument','Pago inválido.');
+
+  const pagoRef = db.collection('pagos').doc(pagoId);
+  const pagoDoc = await pagoRef.get();
+  if (!pagoDoc.exists || pagoDoc.get('estudianteUid') !== uid) throw new HttpsError('not-found','Pago no encontrado.');
+  const pago = pagoDoc.data();
+  if (pago.estado === 'aprobado') return {estado:'aprobado'};
+  if (pago.estado !== 'pendiente') throw new HttpsError('failed-precondition','Este pago ya no se puede procesar. Inicia un pago nuevo.');
+
+  const inscRef = db.collection('inscripciones').doc(pago.inscripcionId);
+  const inscDoc = await inscRef.get();
+  try {validarInscripcionPagable(inscDoc.data(), uid, new Date());}
+  catch (e) {throw new HttpsError('failed-precondition', e.message);}
+
+  let resultado;
+  try {
+    resultado = await paypal.capturarOrden(await tokenPaypal(), pago.paypalOrderId);
+  } catch (e) {
+    if (e.message === 'ORDER_NOT_APPROVED') throw new HttpsError('failed-precondition','Aún no completaste el pago en PayPal.');
+    if (RECHAZOS_PAYPAL.includes(e.message)) {
+      await pagoRef.update({estado:'rechazado'});
+      throw new HttpsError('failed-precondition','PayPal rechazó el pago. Puedes intentarlo de nuevo.');
+    }
+    console.error('PayPal capturarOrden:', e.message);
+    throw new HttpsError('unavailable','No se pudo verificar el pago en PayPal. Inténtalo de nuevo.');
+  }
+  if (!resultado.completado || !montoCoincide(resultado.monto, pago.monto)) {
+    await pagoRef.update({estado:'rechazado'});
+    throw new HttpsError('failed-precondition','El pago no se completó. Puedes intentarlo de nuevo.');
+  }
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const insc = await tx.get(inscRef);
+      if (insc.get('estado') !== 'pendiente') throw new HttpsError('failed-precondition','La inscripción ya no está pendiente.');
+      tx.update(pagoRef, {estado:'aprobado', paypalCaptureId:resultado.captureId});
+      tx.update(inscRef, {
+        estado:'confirmada', pagoId,
+        historial:FieldValue.arrayUnion({estado:'confirmada', fecha:TS.now(), responsableUid:uid}),
+      });
+      tx.update(db.collection('deportes').doc(pago.deporteId), {cuposConfirmados:FieldValue.increment(1)});
+    });
+  } catch (error) {throw errorNegocio(error);}
+  return {estado:'aprobado'};
+});
