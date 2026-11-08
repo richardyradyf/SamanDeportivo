@@ -19,6 +19,7 @@ class InicioEstudianteScreen extends StatelessWidget {
     required this.nombre,
     required this.onCerrarSesion,
     this.perfil,
+    this.pagos,
     this.reloj,
   });
 
@@ -28,6 +29,10 @@ class InicioEstudianteScreen extends StatelessWidget {
   /// Pantalla de perfil (módulo de Alexander). Mientras no exista, se
   /// muestra un aviso de "próximamente".
   final Widget? perfil;
+
+  /// Pagos del estudiante (módulo de Andrés). Si se pasa, aparece un botón
+  /// en la barra superior que la abre; si no, el botón no se muestra.
+  final Widget? pagos;
 
   /// De dónde sale la hora para el saludo. En las pruebas se pasa una hora
   /// fija; en la app se usa la hora real.
@@ -42,11 +47,27 @@ class InicioEstudianteScreen extends StatelessWidget {
       PanelBienvenida.saludoSegunHora(ahora),
       nombre,
     );
+    final paginaPagos = pagos;
 
     return LayoutResponsivo(
       titulo: 'Samán',
       subtitulo: Rol.estudiante.etiqueta,
-      acciones: [BotonCerrarSesion(onConfirmar: onCerrarSesion)],
+      acciones: [
+        if (paginaPagos != null)
+          IconButton(
+            tooltip: 'Pagos',
+            icon: const Icon(Icons.payments_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Pagos')),
+                  body: paginaPagos,
+                ),
+              ),
+            ),
+          ),
+        BotonCerrarSesion(onConfirmar: onCerrarSesion),
+      ],
       destinos: [
         DestinoNavegacion(
           etiqueta: 'Inicio',
