@@ -5,6 +5,7 @@ import 'package:saman_deportivo/features/admin/screens/inicio_admin_screen.dart'
 import 'package:saman_deportivo/features/auth/controllers/sesion_controller.dart';
 import 'package:saman_deportivo/features/entrenador/screens/inicio_entrenador_screen.dart';
 import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_screen.dart';
+import 'package:saman_deportivo/features/pagos/presentation/pagos_estudiante_seccion.dart';
 import 'package:saman_deportivo/features/perfil/presentation/perfil_screen.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/persona.dart';
@@ -14,6 +15,9 @@ typedef ConstructorPerfil = Widget Function(
   Persona persona,
   SesionController sesion,
 );
+
+/// Construye la pantalla de pagos del estudiante en sesión.
+typedef ConstructorPagos = Widget Function(Persona persona);
 
 /// Puerta de entrada de la app: escucha al [SesionController] y decide
 /// qué pantalla mostrar según el estado de la sesión y el rol.
@@ -27,6 +31,7 @@ class AuthGate extends StatelessWidget {
     super.key,
     required this.sinSesion,
     this.construirPerfil = _perfilDeFirestore,
+    this.construirPagos = _pagosDeFirestore,
   });
 
   /// Pantalla para quien no ha iniciado sesión. Se recibe desde afuera
@@ -37,11 +42,21 @@ class AuthGate extends StatelessWidget {
   /// las pruebas.
   final ConstructorPerfil construirPerfil;
 
+  /// Igual que [construirPerfil], para la pantalla de pagos del estudiante.
+  final ConstructorPagos construirPagos;
+
   static Widget _perfilDeFirestore(Persona persona, SesionController sesion) {
     return PerfilScreen(
       key: ValueKey(persona.uid),
       uid: persona.uid,
       cerrarSesion: sesion.cerrarSesion,
+    );
+  }
+
+  static Widget _pagosDeFirestore(Persona persona) {
+    return PagosEstudianteFirebase(
+      key: ValueKey(persona.uid),
+      uid: persona.uid,
     );
   }
 
@@ -78,6 +93,7 @@ class AuthGate extends StatelessWidget {
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+        pagos: construirPagos(persona),
       ),
       Rol.entrenador => InicioEntrenadorScreen(
         key: llave,

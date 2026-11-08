@@ -136,3 +136,13 @@ class _PagosEstudianteSeccionState extends State<PagosEstudianteSeccion> {
     );
   }
 }
+/// Versión con Firebase real. Se arma al abrirse, no al construirla,
+/// para que las pruebas del AuthGate no necesiten Firebase.
+class PagosEstudianteFirebase extends StatelessWidget {
+  const PagosEstudianteFirebase({super.key, required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context) => PagosEstudianteSeccion.firebase(uid);
+}
