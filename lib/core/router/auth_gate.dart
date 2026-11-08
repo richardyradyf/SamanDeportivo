@@ -6,36 +6,50 @@ import 'package:saman_deportivo/features/auth/controllers/sesion_controller.dart
 import 'package:saman_deportivo/features/entrenador/screens/inicio_entrenador_screen.dart';
 import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_screen.dart';
 import 'package:saman_deportivo/features/perfil/presentation/perfil_screen.dart';
-import 'package:saman_deportivo/models/enums.dart';
-import 'package:saman_deportivo/models/persona.dart';
 
-/// Construye la pestaña "Perfil" para la persona en sesión.
+import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/deporte.dart';
+import 'package:saman_deportivo/models/estudiante.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
+import 'package:saman_deportivo/models/persona.dart';
+import 'package:saman_deportivo/repositories/inscripcion_repository.dart';
+
 typedef ConstructorPerfil = Widget Function(
   Persona persona,
   SesionController sesion,
 );
 
-/// Puerta de entrada de la app: escucha al [SesionController] y decide
-/// qué pantalla mostrar según el estado de la sesión y el rol.
-///
-/// - cargando     → indicador de carga
-/// - sinSesion    → [sinSesion] (bienvenida o login)
-/// - sinPerfil    → mensaje de error con opción de cerrar sesión
-/// - autenticado  → inicio del estudiante, entrenador o administrador
+typedef ObtenerInscripciones = Stream<List<Inscripcion>> Function(
+  String estudianteUid,
+);
+
+typedef CancelarInscripcion = Future<void> Function(
+  String inscripcionId, {
+  required String responsableUid,
+});
+
+typedef InscribirEstudiante = Future<Inscripcion> Function({
+  required Estudiante estudiante,
+  required Deporte deporte,
+});
+
 class AuthGate extends StatelessWidget {
   const AuthGate({
     super.key,
     required this.sinSesion,
     this.construirPerfil = _perfilDeFirestore,
+    this.obtenerInscripciones,
+    this.cancelarInscripcion,
+    this.inscribirEstudiante,
   });
 
-  /// Pantalla para quien no ha iniciado sesión. Se recibe desde afuera
-  /// para no depender de una pantalla concreta mientras el login no esté.
   final Widget sinSesion;
-
-  /// Permite cambiar el perfil real (que usa Firestore) por uno falso en
-  /// las pruebas.
   final ConstructorPerfil construirPerfil;
+  final ObtenerInscripciones? obtenerInscripciones;
+
+  /// Función opcional para cancelar una inscripción.
+  final CancelarInscripcion? cancelarInscripcion;
+  final InscribirEstudiante? inscribirEstudiante;
 
   static Widget _perfilDeFirestore(Persona persona, SesionController sesion) {
     return PerfilScreen(
@@ -53,38 +67,58 @@ class AuthGate extends StatelessWidget {
     switch (sesion.estado) {
       case EstadoSesion.cargando:
         return const _Cargando();
+
       case EstadoSesion.sinSesion:
         return sinSesion;
+
       case EstadoSesion.sinPerfil:
         return _SinPerfil(
           mensaje: sesion.error,
           onCerrarSesion: sesion.cerrarSesion,
         );
+
       case EstadoSesion.autenticado:
-        // No debería pasar, pero si el estado llega antes que la persona
-        // esperamos en vez de fallar.
-        if (persona == null) return const _Cargando();
-        return _inicioSegunRol(persona, sesion);
+        if (persona == null) {
+          return const _Cargando();
+        }
+
+        return _inicioSegunRol(context, persona, sesion);
     }
   }
 
-  Widget _inicioSegunRol(Persona persona, SesionController sesion) {
-    // La llave con el uid reinicia la navegación si cambia el usuario.
+  Widget _inicioSegunRol(
+    BuildContext context,
+    Persona persona,
+    SesionController sesion,
+  ) {
     final llave = ValueKey(persona.uid);
 
     return switch (persona.rol) {
       Rol.estudiante => InicioEstudianteScreen(
+        uid: persona.uid,
+        onInscribirse: persona is Estudiante && inscribirEstudiante != null
+            ? (deporte) =>
+                  inscribirEstudiante!(estudiante: persona, deporte: deporte)
+            : null,
         key: llave,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+        inscripcionesStream: obtenerInscripciones?.call(persona.uid),
+        onCancelarInscripcion: cancelarInscripcion == null
+            ? null
+            : (inscripcion) {
+                _solicitarCancelacion(context, inscripcion, persona.uid);
+              },
       ),
+
       Rol.entrenador => InicioEntrenadorScreen(
         key: llave,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
       ),
+
       Rol.administrador => InicioAdminScreen(
         key: llave,
         nombre: persona.nombre,
@@ -92,6 +126,90 @@ class AuthGate extends StatelessWidget {
         perfil: construirPerfil(persona, sesion),
       ),
     };
+  }
+
+  Future<void> _solicitarCancelacion(
+    BuildContext context,
+    Inscripcion inscripcion,
+    String estudianteUid,
+  ) async {
+    // Verificar que el estudiante sea propietario
+    // de la inscripción antes de solicitar cancelación.
+    if (inscripcion.estudianteUid != estudianteUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No puedes cancelar una inscripción de otro estudiante.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancelar inscripción'),
+        content: Text(
+          '¿Deseas cancelar tu inscripción en '
+          '${inscripcion.deporteNombre}?\n\n'
+          'Esta acción liberará tu cupo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(false);
+            },
+            child: const Text('Volver'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(true);
+            },
+            child: const Text('Confirmar cancelación'),
+          ),
+        ],
+      ),
+    );
+
+    // El estudiante decidió no cancelar.
+    if (confirmado != true || !context.mounted) {
+      return;
+    }
+
+    try {
+      await cancelarInscripcion!(inscripcion.id, responsableUid: estudianteUid);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tu inscripción fue cancelada correctamente.'),
+        ),
+      );
+    } on InscripcionException catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.mensaje)));
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se pudo cancelar la inscripción. '
+            'Intenta nuevamente.',
+          ),
+        ),
+      );
+    }
   }
 }
 

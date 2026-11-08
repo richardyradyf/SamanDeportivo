@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
+import 'features/estudiante/inscripciones/data/firestore_inscripcion_repository.dart';
 import 'core/config/entorno.dart';
 import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
@@ -44,8 +45,12 @@ class SamanDeportivoApp extends StatelessWidget {
       title: 'Samán Deportivo',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.claro,
-      home: const AuthGate(
-        sinSesion:  LoginScreen(),
+      home: AuthGate(
+        sinSesion: const LoginScreen(),
+        obtenerInscripciones:
+            FirestoreInscripcionRepository().observarDeEstudiante,
+        cancelarInscripcion: FirestoreInscripcionRepository().cancelar,
+        inscribirEstudiante: FirestoreInscripcionRepository().inscribirse,
       ),
     );
   }

@@ -4,15 +4,16 @@ import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/catalogo_screen.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/detalle_deporte_screen.dart';
+import 'package:saman_deportivo/features/estudiante/inscripciones/screens/mis_inscripciones_screen.dart';
 import 'package:saman_deportivo/features/estudiante/widgets/sin_inscripciones_card.dart';
+import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
+import 'package:saman_deportivo/repositories/deporte_repository.dart';
+import 'package:saman_deportivo/repositories/resena_repository.dart';
 
-/// Pantalla de inicio del estudiante, según el Figma:
-/// Inicio, Explorar, Mis deportes, Inscripciones y Perfil.
-///
-/// Recibe por parámetro lo que necesita (nombre y cómo cerrar sesión) en
-/// vez de buscar la sesión por su cuenta: así se puede probar sin Firebase.
-/// Quien le pasa esos datos es el AuthGate.
 class InicioEstudianteScreen extends StatelessWidget {
   const InicioEstudianteScreen({
     super.key,
@@ -20,20 +21,73 @@ class InicioEstudianteScreen extends StatelessWidget {
     required this.onCerrarSesion,
     this.perfil,
     this.reloj,
+    this.inscripcionesStream,
+    this.onCancelarInscripcion,
+    this.deportes,
+    this.resenas,
+    this.uid,
+    this.onInscribirse,
   });
 
   final String nombre;
   final VoidCallback onCerrarSesion;
-
-  /// Pantalla de perfil (módulo de Alexander). Mientras no exista, se
-  /// muestra un aviso de "próximamente".
   final Widget? perfil;
-
-  /// De dónde sale la hora para el saludo. En las pruebas se pasa una hora
-  /// fija; en la app se usa la hora real.
   final DateTime Function()? reloj;
 
+  // Funcionalidades de inscripciones de Mariana.
+  final Stream<List<Inscripcion>>? inscripcionesStream;
+  final ValueChanged<Inscripcion>? onCancelarInscripcion;
+
+  // Funcionalidades del catálogo de Gabriel.
+  final DeporteRepository? deportes;
+  final ResenaRepository? resenas;
+  final String? uid;
+  final Future<Inscripcion> Function(Deporte deporte)? onInscribirse;
+
   static const indiceExplorar = 1;
+
+  void _verDeporte(BuildContext context, Deporte deporte) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DetalleDeporteScreen(
+          deporte: deporte,
+          deportes: deportes,
+          resenas: resenas,
+          estudianteUid: uid,
+          estudianteNombre: nombre,
+          onInscribirse: onInscribirse == null
+              ? null
+              : (deporteSeleccionado) async {
+                  try {
+                    await onInscribirse!(deporteSeleccionado);
+
+                    if (!context.mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Inscripción creada correctamente. '
+                          'Está pendiente de pago.',
+                        ),
+                      ),
+                    );
+                  } catch (error) {
+                    if (!context.mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'No se pudo completar la inscripción. '
+                          'Verifica los cupos y vuelve a intentarlo.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,8 +106,6 @@ class InicioEstudianteScreen extends StatelessWidget {
           etiqueta: 'Inicio',
           icono: Icons.home_outlined,
           iconoSeleccionado: Icons.home,
-          // Por ahora siempre "sin inscripciones": la próxima actividad y
-          // "Mis disciplinas" llegan cuando exista el módulo de inscripciones.
           pantalla: Builder(
             builder: (context) => PanelBienvenida(
               saludo: '$saludo 👋',
@@ -63,12 +115,19 @@ class InicioEstudianteScreen extends StatelessWidget {
             ),
           ),
         ),
-        const DestinoNavegacion(
+
+        // Catálogo de Gabriel.
+        DestinoNavegacion(
           etiqueta: 'Explorar',
           icono: Icons.search,
           iconoSeleccionado: Icons.search,
-          pantalla: SeccionPendiente(titulo: 'Explorar', icono: Icons.search),
+          pantalla: CatalogoScreen(
+            repositorio: deportes,
+            usuarioUid: uid,
+            onVerDeporte: (deporte) => _verDeporte(context, deporte),
+          ),
         ),
+
         const DestinoNavegacion(
           etiqueta: 'Mis deportes',
           icono: Icons.sports_soccer_outlined,
@@ -78,15 +137,18 @@ class InicioEstudianteScreen extends StatelessWidget {
             icono: Icons.sports_soccer,
           ),
         ),
-        const DestinoNavegacion(
+
+        // Inscripciones de Mariana.
+        DestinoNavegacion(
           etiqueta: 'Inscripciones',
           icono: Icons.assignment_outlined,
           iconoSeleccionado: Icons.assignment,
-          pantalla: SeccionPendiente(
-            titulo: 'Inscripciones',
-            icono: Icons.assignment,
+          pantalla: MisInscripcionesScreen(
+            inscripcionesStream: inscripcionesStream,
+            onCancelarInscripcion: onCancelarInscripcion,
           ),
         ),
+
         DestinoNavegacion(
           etiqueta: 'Perfil',
           icono: Icons.person_outline,
