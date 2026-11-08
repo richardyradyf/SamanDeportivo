@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
@@ -6,6 +8,7 @@ import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/catalogo_screen.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/detalle_deporte_screen.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/permiso_resena.dart';
 import 'package:saman_deportivo/features/estudiante/inscripciones/screens/mis_inscripciones_screen.dart';
 import 'package:saman_deportivo/features/estudiante/widgets/sin_inscripciones_card.dart';
 import 'package:saman_deportivo/models/deporte.dart';
@@ -14,7 +17,13 @@ import 'package:saman_deportivo/models/inscripcion.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 import 'package:saman_deportivo/repositories/resena_repository.dart';
 
-class InicioEstudianteScreen extends StatelessWidget {
+/// Pantalla de inicio del estudiante, según el Figma:
+/// Inicio, Explorar, Mis deportes, Inscripciones y Perfil.
+///
+/// Recibe por parámetro lo que necesita (nombre, sesión, repositorios) en
+/// vez de buscarlo por su cuenta: así se puede probar sin Firebase. Quien
+/// le pasa esos datos es el AuthGate.
+class InicioEstudianteScreen extends StatefulWidget {
   const InicioEstudianteScreen({
     super.key,
     required this.nombre,
@@ -31,7 +40,11 @@ class InicioEstudianteScreen extends StatelessWidget {
 
   final String nombre;
   final VoidCallback onCerrarSesion;
+
+  /// Pantalla de perfil (módulo de Alexander).
   final Widget? perfil;
+
+  /// De dónde sale la hora para el saludo; en las pruebas, una hora fija.
   final DateTime Function()? reloj;
 
   // Funcionalidades de inscripciones de Mariana.
@@ -46,44 +59,137 @@ class InicioEstudianteScreen extends StatelessWidget {
 
   static const indiceExplorar = 1;
 
+  @override
+  State<InicioEstudianteScreen> createState() => _InicioEstudianteScreenState();
+}
+
+class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
+  // Las inscripciones las usan dos pantallas: "Mis inscripciones" y el
+  // detalle del deporte (para saber si el estudiante puede calificar). Se
+  // escuchan UNA sola vez aquí y se reparten, porque un stream de Firestore
+  // no siempre admite dos suscripciones y el detalle se abre más tarde.
+  final _inscripciones = ValueNotifier<List<Inscripcion>?>(null);
+  final _cambios = StreamController<List<Inscripcion>>.broadcast();
+  StreamSubscription<List<Inscripcion>>? _suscripcion;
+  Object? _error;
+  Stream<List<Inscripcion>>? _paraMisInscripciones;
+
+  @override
+  void initState() {
+    super.initState();
+    _escuchar(widget.inscripcionesStream);
+  }
+
+  @override
+  void didUpdateWidget(InicioEstudianteScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.inscripcionesStream != widget.inscripcionesStream) {
+      _escuchar(widget.inscripcionesStream);
+    }
+  }
+
+  void _escuchar(Stream<List<Inscripcion>>? origen) {
+    _suscripcion?.cancel();
+    _suscripcion = null;
+    _error = null;
+    if (origen == null) {
+      _paraMisInscripciones = null;
+      return;
+    }
+    _suscripcion = origen.listen(
+      (lista) {
+        _error = null;
+        _inscripciones.value = lista;
+        _cambios.add(lista);
+      },
+      onError: (Object error, StackTrace pila) {
+        _error = error;
+        _cambios.addError(error, pila);
+      },
+    );
+    _paraMisInscripciones = _conUltimoValor();
+  }
+
+  /// Stream para "Mis inscripciones": entrega primero el último valor que
+  /// llegó (o el último error) y después cada cambio.
+  Stream<List<Inscripcion>> _conUltimoValor() {
+    late final StreamController<List<Inscripcion>> salida;
+    StreamSubscription<List<Inscripcion>>? reenvio;
+    salida = StreamController<List<Inscripcion>>(
+      onListen: () {
+        final ultimo = _inscripciones.value;
+        final error = _error;
+        if (error != null) {
+          salida.addError(error);
+        } else if (ultimo != null) {
+          salida.add(ultimo);
+        }
+        reenvio = _cambios.stream.listen(
+          salida.add,
+          onError: salida.addError,
+        );
+      },
+      onCancel: () => reenvio?.cancel(),
+    );
+    return salida.stream;
+  }
+
+  @override
+  void dispose() {
+    _suscripcion?.cancel();
+    _cambios.close();
+    _inscripciones.dispose();
+    super.dispose();
+  }
+
   void _verDeporte(BuildContext context, Deporte deporte) {
+    final onInscribirse = widget.onInscribirse;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => DetalleDeporteScreen(
-          deporte: deporte,
-          deportes: deportes,
-          resenas: resenas,
-          estudianteUid: uid,
-          estudianteNombre: nombre,
-          onInscribirse: onInscribirse == null
-              ? null
-              : (deporteSeleccionado) async {
-                  try {
-                    await onInscribirse!(deporteSeleccionado);
+        // Si el estudiante paga con el detalle abierto, su inscripción pasa
+        // a confirmada y el formulario de reseña aparece sin recargar.
+        builder: (_) => ValueListenableBuilder<List<Inscripcion>?>(
+          valueListenable: _inscripciones,
+          builder: (context, inscripciones, _) => DetalleDeporteScreen(
+            deporte: deporte,
+            deportes: widget.deportes,
+            resenas: widget.resenas,
+            estudianteUid: widget.uid,
+            estudianteNombre: widget.nombre,
+            puedeResenar: tieneInscripcionConfirmada(
+              inscripciones,
+              deporte.codigo,
+            ),
+            onInscribirse: onInscribirse == null
+                ? null
+                : (deporteSeleccionado) async {
+                    try {
+                      await onInscribirse(deporteSeleccionado);
 
-                    if (!context.mounted) return;
+                      if (!context.mounted) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Inscripción creada correctamente. '
-                          'Está pendiente de pago.',
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Inscripción creada correctamente. '
+                            'Está pendiente de pago.',
+                          ),
                         ),
-                      ),
-                    );
-                  } catch (error) {
-                    if (!context.mounted) return;
+                      );
+                    } catch (error) {
+                      if (!context.mounted) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'No se pudo completar la inscripción. '
-                          'Verifica los cupos y vuelve a intentarlo.',
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'No se pudo completar la inscripción. '
+                            'Verifica los cupos y vuelve a intentarlo.',
+                          ),
                         ),
-                      ),
-                    );
-                  }
-                },
+                      );
+                    }
+                  },
+          ),
         ),
       ),
     );
@@ -91,16 +197,16 @@ class InicioEstudianteScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ahora = (reloj ?? DateTime.now)();
+    final ahora = (widget.reloj ?? DateTime.now)();
     final saludo = PanelBienvenida.componer(
       PanelBienvenida.saludoSegunHora(ahora),
-      nombre,
+      widget.nombre,
     );
 
     return LayoutResponsivo(
       titulo: 'Samán',
       subtitulo: Rol.estudiante.etiqueta,
-      acciones: [BotonCerrarSesion(onConfirmar: onCerrarSesion)],
+      acciones: [BotonCerrarSesion(onConfirmar: widget.onCerrarSesion)],
       destinos: [
         DestinoNavegacion(
           etiqueta: 'Inicio',
@@ -110,7 +216,10 @@ class InicioEstudianteScreen extends StatelessWidget {
             builder: (context) => PanelBienvenida(
               saludo: '$saludo 👋',
               contenido: SinInscripcionesCard(
-                onExplorar: () => LayoutResponsivo.irA(context, indiceExplorar),
+                onExplorar: () => LayoutResponsivo.irA(
+                  context,
+                  InicioEstudianteScreen.indiceExplorar,
+                ),
               ),
             ),
           ),
@@ -122,8 +231,8 @@ class InicioEstudianteScreen extends StatelessWidget {
           icono: Icons.search,
           iconoSeleccionado: Icons.search,
           pantalla: CatalogoScreen(
-            repositorio: deportes,
-            usuarioUid: uid,
+            repositorio: widget.deportes,
+            usuarioUid: widget.uid,
             onVerDeporte: (deporte) => _verDeporte(context, deporte),
           ),
         ),
@@ -144,8 +253,8 @@ class InicioEstudianteScreen extends StatelessWidget {
           icono: Icons.assignment_outlined,
           iconoSeleccionado: Icons.assignment,
           pantalla: MisInscripcionesScreen(
-            inscripcionesStream: inscripcionesStream,
-            onCancelarInscripcion: onCancelarInscripcion,
+            inscripcionesStream: _paraMisInscripciones,
+            onCancelarInscripcion: widget.onCancelarInscripcion,
           ),
         ),
 
@@ -154,7 +263,7 @@ class InicioEstudianteScreen extends StatelessWidget {
           icono: Icons.person_outline,
           iconoSeleccionado: Icons.person,
           pantalla:
-              perfil ??
+              widget.perfil ??
               const SeccionPendiente(titulo: 'Perfil', icono: Icons.person),
         ),
       ],
