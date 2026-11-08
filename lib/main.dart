@@ -50,6 +50,7 @@ class SamanDeportivoApp extends StatelessWidget {
         obtenerInscripciones:
             FirestoreInscripcionRepository().observarDeEstudiante,
         cancelarInscripcion: FirestoreInscripcionRepository().cancelar,
+        inscribirEstudiante: FirestoreInscripcionRepository().inscribirse,
       ),
     );
   }

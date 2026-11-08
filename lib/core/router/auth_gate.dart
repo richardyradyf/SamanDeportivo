@@ -8,6 +8,8 @@ import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_sc
 import 'package:saman_deportivo/features/perfil/presentation/perfil_screen.dart';
 
 import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/deporte.dart';
+import 'package:saman_deportivo/models/estudiante.dart';
 import 'package:saman_deportivo/models/inscripcion.dart';
 import 'package:saman_deportivo/models/persona.dart';
 import 'package:saman_deportivo/repositories/inscripcion_repository.dart';
@@ -26,6 +28,11 @@ typedef CancelarInscripcion = Future<void> Function(
   required String responsableUid,
 });
 
+typedef InscribirEstudiante = Future<Inscripcion> Function({
+  required Estudiante estudiante,
+  required Deporte deporte,
+});
+
 class AuthGate extends StatelessWidget {
   const AuthGate({
     super.key,
@@ -33,6 +40,7 @@ class AuthGate extends StatelessWidget {
     this.construirPerfil = _perfilDeFirestore,
     this.obtenerInscripciones,
     this.cancelarInscripcion,
+    this.inscribirEstudiante,
   });
 
   final Widget sinSesion;
@@ -41,6 +49,7 @@ class AuthGate extends StatelessWidget {
 
   /// Función opcional para cancelar una inscripción.
   final CancelarInscripcion? cancelarInscripcion;
+  final InscribirEstudiante? inscribirEstudiante;
 
   static Widget _perfilDeFirestore(Persona persona, SesionController sesion) {
     return PerfilScreen(
@@ -86,6 +95,11 @@ class AuthGate extends StatelessWidget {
 
     return switch (persona.rol) {
       Rol.estudiante => InicioEstudianteScreen(
+        uid: persona.uid,
+        onInscribirse: persona is Estudiante && inscribirEstudiante != null
+            ? (deporte) =>
+                  inscribirEstudiante!(estudiante: persona, deporte: deporte)
+            : null,
         key: llave,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
