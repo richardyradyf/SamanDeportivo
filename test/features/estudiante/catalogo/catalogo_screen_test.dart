@@ -5,9 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:saman_deportivo/core/theme/app_theme.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/catalogo_screen.dart';
 import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_screen.dart';
+import 'package:saman_deportivo/models/busqueda.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/horario_sesion.dart';
+import 'package:saman_deportivo/repositories/busqueda_repository.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 
 /// Repositorio falso: entrega el catálogo que se le pase, sin Firebase.
@@ -23,6 +25,20 @@ class _RepositorioFalso implements DeporteRepository {
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError('El catálogo no usa ${invocation.memberName}');
+}
+
+/// Guarda en memoria las búsquedas que registra el catálogo.
+class _BusquedasFalsas implements BusquedaRepository {
+  final guardadas = <Busqueda>[];
+
+  @override
+  Future<void> registrar(Busqueda busqueda) async {
+    guardadas.add(busqueda);
+  }
+
+  @override
+  Stream<List<Busqueda>> observarDesde(DateTime desde) =>
+      const Stream.empty();
 }
 
 Deporte _deporte(
@@ -303,5 +319,73 @@ void main() {
 
     expect(find.text('Encuentra una disciplina para ti.'), findsOneWidget);
     expect(find.text('FÚTBOL SALA'), findsOneWidget);
+  });
+
+  group('Registro de búsquedas', () {
+    CatalogoScreen catalogoQueRegistra(_BusquedasFalsas busquedas) =>
+        CatalogoScreen(
+          repositorio: _RepositorioFalso(Stream.value(_catalogo)),
+          busquedas: busquedas,
+          usuarioUid: 'uid-ana',
+        );
+
+    testWidgets('guarda una sola búsqueda cuando se deja de escribir 1 s', (
+      tester,
+    ) async {
+      final busquedas = _BusquedasFalsas();
+      await _mostrar(tester, catalogoQueRegistra(busquedas));
+
+      for (final texto in ['f', 'fu', 'fut']) {
+        await tester.enterText(_buscador, texto);
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+      expect(busquedas.guardadas, isEmpty);
+
+      await tester.pump(const Duration(seconds: 1));
+
+      final guardada = busquedas.guardadas.single;
+      expect(guardada.termino, 'fut');
+      expect(guardada.deporteIds, ['FUT-01']);
+      expect(guardada.usuarioUid, 'uid-ana');
+    });
+
+    testWidgets('Enter guarda la búsqueda sin esperar', (tester) async {
+      final busquedas = _BusquedasFalsas();
+      await _mostrar(tester, catalogoQueRegistra(busquedas));
+
+      await tester.enterText(_buscador, 'tenis');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+      expect(busquedas.guardadas.single.termino, 'tenis');
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(busquedas.guardadas, hasLength(1));
+    });
+
+    testWidgets('cambiar un filtro también cuenta como búsqueda', (
+      tester,
+    ) async {
+      final busquedas = _BusquedasFalsas();
+      await _mostrar(tester, catalogoQueRegistra(busquedas), tamano: _escritorio);
+
+      await tester.tap(find.text('Solo con cupos'));
+      await tester.pump(const Duration(seconds: 1));
+
+      final guardada = busquedas.guardadas.single;
+      expect(guardada.termino, isEmpty);
+      expect(guardada.filtros, {'soloConCupo': true});
+      expect(guardada.deporteIds, ['BAS-01', 'FUT-01', 'NAT-01']);
+    });
+
+    testWidgets('borrar la búsqueda no guarda nada', (tester) async {
+      final busquedas = _BusquedasFalsas();
+      await _mostrar(tester, catalogoQueRegistra(busquedas));
+
+      await tester.enterText(_buscador, 'x');
+      await tester.enterText(_buscador, '');
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(busquedas.guardadas, isEmpty);
+    });
   });
 }

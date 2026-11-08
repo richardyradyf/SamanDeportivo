@@ -45,8 +45,8 @@ class InicioEstudianteScreen extends StatelessWidget {
   /// null, el catálogo usa Firestore.
   final DeporteRepository? deportes;
 
-  /// Reseñas de los deportes. Mientras sea null, el detalle avisa que
-  /// todavía no están disponibles.
+  /// Reseñas de los deportes. En las pruebas se pasa uno falso; si es
+  /// null, el detalle usa Firestore.
   final ResenaRepository? resenas;
 
   /// UID del estudiante, para reconocer su propia reseña.
@@ -103,6 +103,7 @@ class InicioEstudianteScreen extends StatelessWidget {
           iconoSeleccionado: Icons.search,
           pantalla: CatalogoScreen(
             repositorio: deportes,
+            usuarioUid: uid,
             onVerDeporte: (deporte) => _verDeporte(context, deporte),
           ),
         ),

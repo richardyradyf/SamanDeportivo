@@ -4,10 +4,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/data/firestore_busqueda_repository.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/filtro_catalogo.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/registro_busquedas.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/panel_filtros.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/tarjeta_deporte.dart';
 import 'package:saman_deportivo/models/deporte.dart';
+import 'package:saman_deportivo/repositories/busqueda_repository.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 
 /// Catálogo de deportes del estudiante, pestaña "Explorar" (RF-05, RF-06).
@@ -16,9 +19,22 @@ import 'package:saman_deportivo/repositories/deporte_repository.dart';
 /// filtros en la app con [FiltroCatalogo]. El repositorio se puede pasar
 /// por parámetro para probar la pantalla sin Firebase.
 class CatalogoScreen extends StatefulWidget {
-  const CatalogoScreen({super.key, this.repositorio, this.onVerDeporte});
+  const CatalogoScreen({
+    super.key,
+    this.repositorio,
+    this.busquedas,
+    this.usuarioUid,
+    this.onVerDeporte,
+  });
 
   final DeporteRepository? repositorio;
+
+  /// Dónde se guardan las búsquedas para las métricas (RF-18). Si es null
+  /// y Firebase está iniciado, se usa Firestore.
+  final BusquedaRepository? busquedas;
+
+  /// UID de quien busca; null si no hay sesión.
+  final String? usuarioUid;
 
   /// Qué hacer al tocar una tarjeta (abrir el detalle del deporte).
   final void Function(Deporte deporte)? onVerDeporte;
@@ -35,6 +51,10 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
   final _buscador = TextEditingController();
   Stream<List<Deporte>>? _deportes;
   FiltroCatalogo _filtro = const FiltroCatalogo();
+  RegistroBusquedas? _registro;
+
+  /// Último catálogo recibido, para calcular los resultados que se guardan.
+  List<Deporte> _catalogoActual = const [];
 
   @override
   void initState() {
@@ -45,16 +65,32 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
         widget.repositorio ??
         (Firebase.apps.isNotEmpty ? FirestoreDeporteRepository() : null);
     _deportes = repositorio?.observarCatalogo();
+
+    final busquedas =
+        widget.busquedas ??
+        (Firebase.apps.isNotEmpty ? FirestoreBusquedaRepository() : null);
+    if (busquedas != null) {
+      _registro = RegistroBusquedas(
+        repositorio: busquedas,
+        usuarioUid: widget.usuarioUid,
+      );
+    }
   }
 
   @override
   void dispose() {
+    _registro?.dispose();
     _buscador.dispose();
     super.dispose();
   }
 
   void _cambiarFiltro(FiltroCatalogo nuevo) {
     setState(() => _filtro = nuevo);
+    _registro?.programar(nuevo, () => nuevo.aplicar(_catalogoActual));
+  }
+
+  void _confirmarBusqueda() {
+    _registro?.confirmar(_filtro, _filtro.aplicar(_catalogoActual));
   }
 
   void _limpiarTodo() {
@@ -137,6 +173,7 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
     required bool lateral,
   }) {
     final tema = Theme.of(context);
+    _catalogoActual = catalogo;
     final especialidades = FiltroCatalogo.especialidadesDe(catalogo);
     final resultados = _filtro.aplicar(catalogo);
     final cantidad = _filtro.cantidadFiltros;
@@ -146,6 +183,7 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
       controller: _buscador,
       onChanged: (texto) => _cambiarFiltro(_filtro.copyWith(texto: texto)),
       textInputAction: TextInputAction.search,
+      onSubmitted: (_) => _confirmarBusqueda(),
       decoration: InputDecoration(
         hintText: 'Buscar deporte o código',
         prefixIcon: const Icon(Icons.search),

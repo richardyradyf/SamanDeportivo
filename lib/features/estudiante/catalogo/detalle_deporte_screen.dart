@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:saman_deportivo/core/theme/app_theme.dart';
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/data/firestore_resena_repository.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/formato_catalogo.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/estrellas.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/etiqueta_cupos.dart';
@@ -35,8 +36,8 @@ class DetalleDeporteScreen extends StatefulWidget {
   final Deporte deporte;
   final DeporteRepository? deportes;
 
-  /// Reseñas del deporte. Si es null, la sección dice que no están
-  /// disponibles.
+  /// Reseñas del deporte. Si es null y Firebase está iniciado, se usa
+  /// Firestore; sin Firebase, la sección dice que no están disponibles.
   final ResenaRepository? resenas;
   final String? estudianteUid;
   final String? estudianteNombre;
@@ -57,6 +58,7 @@ class DetalleDeporteScreen extends StatefulWidget {
 class _DetalleDeporteScreenState extends State<DetalleDeporteScreen> {
   Stream<Deporte?>? _deporte;
   Stream<List<Resena>>? _resenas;
+  ResenaRepository? _repositorioResenas;
 
   @override
   void initState() {
@@ -66,11 +68,14 @@ class _DetalleDeporteScreenState extends State<DetalleDeporteScreen> {
         widget.deportes ??
         (Firebase.apps.isNotEmpty ? FirestoreDeporteRepository() : null);
     _deporte = deportes?.observar(codigo);
-    _resenas = widget.resenas?.observar(codigo);
+    _repositorioResenas =
+        widget.resenas ??
+        (Firebase.apps.isNotEmpty ? FirestoreResenaRepository() : null);
+    _resenas = _repositorioResenas?.observar(codigo);
   }
 
   Future<void> _guardarResena(int puntuacion, String comentario) {
-    return widget.resenas!.guardar(
+    return _repositorioResenas!.guardar(
       widget.deporte.codigo,
       Resena(
         estudianteUid: widget.estudianteUid!,
@@ -176,7 +181,7 @@ class _DetalleDeporteScreenState extends State<DetalleDeporteScreen> {
                 estudianteUid: widget.estudianteUid,
                 puedeResenar:
                     widget.puedeResenar &&
-                    widget.resenas != null &&
+                    _repositorioResenas != null &&
                     widget.estudianteUid != null,
                 onGuardar: _guardarResena,
               ),
