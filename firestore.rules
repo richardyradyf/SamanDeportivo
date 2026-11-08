@@ -117,6 +117,61 @@ service cloud.firestore {
         && d.creadoEn is timestamp;
     }
 
+    // A3.6 — Seguridad para RF-17/RF-06. No abre contadores de deportes.
+    function puedeResenar(uid, codigo) {
+      let inscripcionId = uid + '_' + codigo;
+      return autenticado()
+        && request.auth.uid == uid
+        && exists(/databases/$(database)/documents/usuarios/$(uid))
+        && get(/databases/$(database)/documents/usuarios/$(uid)).data.rol == 'estudiante'
+        && exists(/databases/$(database)/documents/inscripciones/$(inscripcionId))
+        && get(/databases/$(database)/documents/inscripciones/$(inscripcionId)).data.estado == 'confirmada'
+        && get(/databases/$(database)/documents/inscripciones/$(inscripcionId)).data.estudianteUid == uid
+        && get(/databases/$(database)/documents/inscripciones/$(inscripcionId)).data.deporteId == codigo;
+    }
+
+    function resenaValida(d) {
+      return d.keys().hasAll([
+          'estudianteNombre', 'puntuacion', 'comentario', 'oculta', 'fecha'
+        ])
+        && d.keys().hasOnly([
+          'estudianteNombre', 'puntuacion', 'comentario', 'oculta', 'fecha'
+        ])
+        && d.estudianteNombre is string
+        && d.estudianteNombre.size() <= 100
+        && d.puntuacion is int
+        && d.puntuacion >= 1 && d.puntuacion <= 5
+        && d.comentario is string && d.comentario.size() <= 300
+        && d.oculta is bool
+        && d.fecha is timestamp;
+    }
+
+    function busquedaValida() {
+      let d = request.resource.data;
+      return d.keys().hasAll([
+          'termino', 'filtros', 'deporteIds', 'usuarioUid', 'fecha'
+        ])
+        && d.keys().hasOnly([
+          'termino', 'filtros', 'deporteIds', 'usuarioUid', 'fecha'
+        ])
+        && d.termino is string && d.termino.size() <= 120
+        && d.filtros is map
+        && d.filtros.keys().hasOnly([
+          'disciplina', 'dia', 'turno', 'especialidad', 'soloConCupo'
+        ])
+        && (!('disciplina' in d.filtros) || d.filtros.disciplina is string)
+        && (!('dia' in d.filtros) || d.filtros.dia is string)
+        && (!('turno' in d.filtros) || d.filtros.turno is string)
+        && (!('especialidad' in d.filtros) || d.filtros.especialidad is string)
+        && (!('soloConCupo' in d.filtros) || d.filtros.soloConCupo is bool)
+        && d.deporteIds is list && d.deporteIds.size() <= 50
+        && (d.usuarioUid == null
+          || (autenticado() && d.usuarioUid == request.auth.uid))
+        && d.fecha is timestamp
+        && d.fecha >= request.time - duration.value(10, 'm')
+        && d.fecha <= request.time + duration.value(10, 'm');
+    }
+
     // A2.3 — Agenda protegida por Cloud Functions
     match /deportes/{codigo} {
       // La lectura del catalogo es publica (RF-05). No incluir datos privados.
@@ -149,33 +204,59 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // A3.2: moderación limitada a ocultar/mostrar, sin alterar contenido.
+      // A3.6: público solo ve reseñas visibles; admin ve todas.
+      // Importante: las consultas públicas deben usar where('oculta', isEqualTo: false).
       match /resenas/{estudianteUid} {
-        allow get, list: if esAdministrador();
-        allow update: if esAdministrador()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['oculta'])
-          && request.resource.data.oculta is bool;
-        allow create, delete: if false;
+        allow get, list: if esAdministrador()
+          || resource.data.oculta == false;
+
+        // ID del documento = UID autenticado, inscripción confirmada.
+        // Los estudiantes nunca eligen la visibilidad de su reseña.
+        allow create: if puedeResenar(estudianteUid, codigo)
+          && resenaValida(request.resource.data)
+          && request.resource.data.oculta == false;
+
+        // El estudiante solo edita sus datos de reseña, nunca 'oculta'.
+        allow update: if (
+            puedeResenar(estudianteUid, codigo)
+            && resenaValida(request.resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'estudianteNombre', 'puntuacion', 'comentario', 'fecha'
+            ])
+            && request.resource.data.oculta == resource.data.oculta
+          ) || (
+            esAdministrador()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['oculta'])
+            && request.resource.data.oculta is bool
+          );
+        allow delete: if false;
       }
     }
 
-    // A3.5 — lecturas administrativas de operaciones (solo lectura)
-    // Estos datos pueden incluir datos personales o comerciales.
-    // Solo el administrador puede consultar documentos o colecciones.
-    // Las escrituras se integran exclusivamente con los módulos responsables.
+    // A3.5 — datos operativos: administrador lee todo; estudiante solo lo propio.
+    // No habilitar escrituras de pagos desde Flutter. Inscripciones requieren
+    // transacciones seguras de cupos acordadas con Mariana.
+    // A3.10 — Lectura propia de inscripciones y pagos.
+    // El frontend DEBE filtrar con where('estudianteUid', isEqualTo: uid).
+    // Las escrituras de pagos siguen reservadas a las Cloud Functions (Admin SDK).
     match /inscripciones/{inscripcionId} {
-      allow get, list: if esAdministrador();
+      allow get, list: if esAdministrador()
+        || (autenticado() && resource.data.estudianteUid == request.auth.uid);
       allow create, update, delete: if false;
     }
 
     match /pagos/{pagoId} {
-      allow get, list: if esAdministrador();
+      allow get, list: if esAdministrador()
+        || (autenticado() && resource.data.estudianteUid == request.auth.uid);
       allow create, update, delete: if false;
     }
 
     match /busquedas/{busquedaId} {
       allow get, list: if esAdministrador();
-      allow create, update, delete: if false;
+      // RF-06: landing sin sesión y catálogo autenticado.
+      // El cliente solo registra eventos; no puede leer/modificar registros.
+      allow create: if busquedaValida();
+      allow update, delete: if false;
     }
 
     match /{document=**} {
