@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -7,8 +5,8 @@ import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_r
 import 'package:saman_deportivo/features/estudiante/catalogo/data/firestore_busqueda_repository.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/filtro_catalogo.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/registro_busquedas.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/widgets/cuadricula_deportes.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/panel_filtros.dart';
-import 'package:saman_deportivo/features/estudiante/catalogo/widgets/tarjeta_deporte.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/repositories/busqueda_repository.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
@@ -218,7 +216,7 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
         ),
       );
     } else {
-      lista = _Cuadricula(
+      lista = CuadriculaDeportes(
         deportes: resultados,
         onVerDeporte: widget.onVerDeporte,
       );
@@ -302,49 +300,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
           ],
         ],
       ),
-    );
-  }
-}
-
-/// Tarjetas en columnas que se ajustan al ancho: una en celular, dos o
-/// tres en tablet y escritorio.
-class _Cuadricula extends StatelessWidget {
-  const _Cuadricula({required this.deportes, this.onVerDeporte});
-
-  final List<Deporte> deportes;
-  final void Function(Deporte deporte)? onVerDeporte;
-
-  static const double _anchoMinimo = 260;
-  static const double _espacio = 16;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final ancho = constraints.maxWidth;
-        final columnas = math.max(
-          1,
-          ((ancho + _espacio) / (_anchoMinimo + _espacio)).floor(),
-        );
-        final anchoTarjeta = (ancho - _espacio * (columnas - 1)) / columnas;
-        final abrir = onVerDeporte;
-
-        return Wrap(
-          spacing: _espacio,
-          runSpacing: _espacio,
-          children: [
-            for (final deporte in deportes)
-              SizedBox(
-                width: anchoTarjeta,
-                child: TarjetaDeporte(
-                  key: ValueKey(deporte.codigo),
-                  deporte: deporte,
-                  onVer: abrir == null ? null : () => abrir(deporte),
-                ),
-              ),
-          ],
-        );
-      },
     );
   }
 }

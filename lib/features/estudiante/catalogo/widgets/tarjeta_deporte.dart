@@ -78,10 +78,14 @@ class TarjetaDeporte extends StatelessWidget {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Text(
-                          'Ver disciplina',
-                          style: tema.textTheme.labelLarge?.copyWith(
-                            color: colores.onSurface,
+                        Flexible(
+                          child: Text(
+                            'Ver disciplina',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tema.textTheme.labelLarge?.copyWith(
+                              color: colores.onSurface,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 4),
