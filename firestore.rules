@@ -233,17 +233,21 @@ service cloud.firestore {
       }
     }
 
-    // A3.5 — lecturas administrativas de operaciones (solo lectura)
-    // Estos datos pueden incluir datos personales o comerciales.
-    // Solo el administrador puede consultar documentos o colecciones.
-    // Las escrituras se integran exclusivamente con los módulos responsables.
+    // A3.5 — datos operativos: administrador lee todo; estudiante solo lo propio.
+    // No habilitar escrituras de pagos desde Flutter. Inscripciones requieren
+    // transacciones seguras de cupos acordadas con Mariana.
+    // A3.10 — Lectura propia de inscripciones y pagos.
+    // El frontend DEBE filtrar con where('estudianteUid', isEqualTo: uid).
+    // Las escrituras de pagos siguen reservadas a las Cloud Functions (Admin SDK).
     match /inscripciones/{inscripcionId} {
-      allow get, list: if esAdministrador();
+      allow get, list: if esAdministrador()
+        || (autenticado() && resource.data.estudianteUid == request.auth.uid);
       allow create, update, delete: if false;
     }
 
     match /pagos/{pagoId} {
-      allow get, list: if esAdministrador();
+      allow get, list: if esAdministrador()
+        || (autenticado() && resource.data.estudianteUid == request.auth.uid);
       allow create, update, delete: if false;
     }
 

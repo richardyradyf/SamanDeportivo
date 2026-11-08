@@ -604,3 +604,68 @@ test('A3.6: estudiante no puede editar búsquedas existentes', async () => {
   });
   await assertFails(updateDoc(doc(estudiante(), 'busquedas', 'a36-update-deny'), { termino: 'otra' }));
 });
+
+// A3.10 — Lecturas de inscripciones y pagos propias (integración con Andrés).
+// Comparte env, admin(), estudiante() y dependencias de la suite A3.6.
+async function sembrarOperacionesA310(nombre) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, nombre, `a310_${nombre}_propio`), {
+      estudianteUid: 'uid-a',
+      origen: 'a310-permisos-lectura',
+      estado: 'pendiente',
+      fecha: new Date(),
+    });
+    await setDoc(doc(db, nombre, `a310_${nombre}_ajeno`), {
+      estudianteUid: 'uid-b',
+      origen: 'a310-permisos-lectura',
+      estado: 'pendiente',
+      fecha: new Date(),
+    });
+  });
+}
+
+for (const nombre of ['inscripciones', 'pagos']) {
+  test(`A3.10: estudiante lee un documento propio de ${nombre}`, async () => {
+    await sembrarOperacionesA310(nombre);
+    await assertSucceeds(getDoc(doc(estudiante(), nombre, `a310_${nombre}_propio`)));
+  });
+
+  test(`A3.10: estudiante NO lee documentos ajenos de ${nombre}`, async () => {
+    await sembrarOperacionesA310(nombre);
+    await assertFails(getDoc(doc(estudiante(), nombre, `a310_${nombre}_ajeno`)));
+  });
+
+  test(`A3.10: estudiante lista ${nombre} con filtro de UID propio`, async () => {
+    await sembrarOperacionesA310(nombre);
+    const datos = await assertSucceeds(getDocs(query(
+      collection(estudiante(), nombre), where('estudianteUid', '==', 'uid-a'),
+    )));
+    if (!datos.docs.every((d) => d.data().estudianteUid === 'uid-a')) {
+      throw new Error('Se filtró un documento que no pertenece al estudiante.');
+    }
+  });
+
+  test(`A3.10: estudiante NO puede listar ${nombre} sin filtro`, async () => {
+    await assertFails(getDocs(collection(estudiante(), nombre)));
+  });
+
+  test(`A3.10: estudiante NO puede consultar ${nombre} de otro UID`, async () => {
+    await assertFails(getDocs(query(
+      collection(estudiante(), nombre), where('estudianteUid', '==', 'uid-b'),
+    )));
+  });
+
+  test(`A3.10: estudiante NO puede alterar ${nombre} aunque sea suyo`, async () => {
+    await sembrarOperacionesA310(nombre);
+    await assertFails(updateDoc(doc(estudiante(), nombre, `a310_${nombre}_propio`), {
+      estado: nombre === 'pagos' ? 'aprobado' : 'confirmada',
+    }));
+  });
+
+  test(`A3.10: estudiante NO puede crear ${nombre} desde Flutter`, async () => {
+    await assertFails(setDoc(doc(estudiante(), nombre, `a310_${nombre}_falso`), {
+      estudianteUid: 'uid-a', estado: nombre === 'pagos' ? 'aprobado' : 'confirmada',
+    }));
+  });
+}
