@@ -23,6 +23,7 @@ class CatalogoScreen extends StatefulWidget {
     this.busquedas,
     this.usuarioUid,
     this.onVerDeporte,
+    this.textoInicial = '',
   });
 
   final DeporteRepository? repositorio;
@@ -36,6 +37,10 @@ class CatalogoScreen extends StatefulWidget {
 
   /// Qué hacer al tocar una tarjeta (abrir el detalle del deporte).
   final void Function(Deporte deporte)? onVerDeporte;
+
+  /// Texto con el que se abre el buscador; por ejemplo, lo que el visitante
+  /// escribió en el landing.
+  final String textoInicial;
 
   /// Desde este ancho los filtros van en un panel lateral; por debajo,
   /// en una hoja que se abre con el botón "Filtros".
@@ -57,6 +62,8 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
   @override
   void initState() {
     super.initState();
+    _buscador.text = widget.textoInicial;
+    _filtro = FiltroCatalogo(texto: widget.textoInicial);
     // Igual que en la pantalla de deportes del administrador: si Firebase
     // no está iniciado (pruebas del inicio), no se abre Firestore.
     final repositorio =
