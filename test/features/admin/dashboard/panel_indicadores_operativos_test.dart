@@ -73,4 +73,46 @@ void main() {
     );
     expect(find.text('USD 0.00'), findsOneWidget);
   });
+  testWidgets('A3.8: muestra descartes sin inventar fuente sin permisos', (
+    tester,
+  ) async {
+    await mostrar(tester, repo: RepositorioDiagnosticoFalso());
+    expect(find.byKey(const Key('a38-omitidos-inscripciones')), findsOneWidget);
+    expect(
+      find.text('Se omitieron 2 registros con datos inválidos.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('No hay registros válidos para calcular indicadores.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('a34-no-disponible-inscripciones')),
+      findsNothing,
+    );
+    expect(
+      find.text('Consulta permitida; colección sin registros.'),
+      findsNWidgets(2),
+    );
+  });
+}
+
+/// Prueba del contrato ampliado sin alterar el contrato histórico.
+class RepositorioDiagnosticoFalso extends RepositorioFalso
+    implements OperacionesDashboardDiagnosticoRepository {
+  @override
+  Stream<LecturaOperativa<Inscripcion>> observarInscripcionesConDiagnostico() =>
+      Stream.value(
+        const LecturaOperativa(registros: <Inscripcion>[], omitidos: 2),
+      );
+
+  @override
+  Stream<LecturaOperativa<Pago>> observarPagosConDiagnostico() =>
+      Stream.value(const LecturaOperativa(registros: <Pago>[], omitidos: 0));
+
+  @override
+  Stream<LecturaOperativa<Busqueda>> observarBusquedasConDiagnostico() =>
+      Stream.value(
+        const LecturaOperativa(registros: <Busqueda>[], omitidos: 0),
+      );
 }
