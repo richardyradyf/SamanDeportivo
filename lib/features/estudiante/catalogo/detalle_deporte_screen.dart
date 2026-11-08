@@ -8,7 +8,7 @@ import 'package:saman_deportivo/features/estudiante/catalogo/formato_catalogo.da
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/estrellas.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/etiqueta_cupos.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/formulario_resena.dart';
-import 'package:saman_deportivo/features/estudiante/catalogo/widgets/tarjeta_deporte.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/widgets/imagen_deporte.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/resena.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
@@ -126,7 +126,7 @@ class _DetalleDeporteScreenState extends State<DetalleDeporteScreen> {
       borderRadius: BorderRadius.circular(AppTheme.radioTarjeta),
       child: SizedBox(
         height: ancho ? 240 : 160,
-        child: _Portada(deporte: deporte),
+        child: ImagenDeporte(deporte: deporte, tamanoIcono: 64),
       ),
     );
     final datos = _TarjetaDatos(deporte: deporte);
@@ -247,34 +247,6 @@ class _Encabezado extends StatelessWidget {
           Text(deporte.descripcion, style: tema.textTheme.bodyLarge),
         ],
       ],
-    );
-  }
-}
-
-class _Portada extends StatelessWidget {
-  const _Portada({required this.deporte});
-
-  final Deporte deporte;
-
-  @override
-  Widget build(BuildContext context) {
-    final colores = Theme.of(context).colorScheme;
-    final respaldo = ColoredBox(
-      color: colores.secondary,
-      child: Center(
-        child: Icon(
-          TarjetaDeporte.iconoDe(deporte.disciplina),
-          size: 64,
-          color: colores.onSecondary,
-        ),
-      ),
-    );
-    final url = deporte.imagenUrl;
-    if (url == null || url.isEmpty) return respaldo;
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => respaldo,
     );
   }
 }

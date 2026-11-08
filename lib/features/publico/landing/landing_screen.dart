@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:saman_deportivo/core/theme/app_theme.dart';
 import 'package:saman_deportivo/core/utils/busqueda_normalizada.dart';
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/medicion_rendimiento.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/cuadricula_deportes.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
@@ -70,7 +71,21 @@ class _LandingScreenState extends State<LandingScreen> {
     final deportes =
         widget.deportes ??
         (Firebase.apps.isNotEmpty ? FirestoreDeporteRepository() : null);
-    _catalogo = deportes?.observarCatalogo();
+    // Hito 4: tiempo desde que se abre el landing hasta que llegan los
+    // deportes. Se mide una sola vez, con la primera respuesta.
+    final reloj = Stopwatch()..start();
+    var medido = false;
+    _catalogo = deportes?.observarCatalogo().map((lista) {
+      if (!medido) {
+        medido = true;
+        MedicionRendimiento.registrar(
+          'landing: deportes visibles',
+          reloj.elapsed,
+          limite: MedicionRendimiento.limiteCarga,
+        );
+      }
+      return lista;
+    });
   }
 
   @override

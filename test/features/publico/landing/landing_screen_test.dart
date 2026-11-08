@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:saman_deportivo/core/theme/app_theme.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/medicion_rendimiento.dart';
 import 'package:saman_deportivo/features/publico/landing/landing_screen.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
@@ -202,5 +203,18 @@ void main() {
         findsOneWidget,
       );
     });
+  });
+
+  testWidgets('mide cuánto tardan en verse los deportes (Hito 4)', (
+    tester,
+  ) async {
+    MedicionRendimiento.registro.clear();
+
+    await _mostrar(tester);
+
+    final medicion = MedicionRendimiento.registro.single;
+    expect(medicion.evento, 'landing: deportes visibles');
+    expect(medicion.limite, MedicionRendimiento.limiteCarga);
+    expect(medicion.cumple, isTrue);
   });
 }
