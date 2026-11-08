@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 
 let env;
 const datosA = {
@@ -425,3 +425,182 @@ for (const nombre of fuentesA35) {
     await assertFails(deleteDoc(doc(admin(), nombre, id)));
   });
 }
+
+// A3.6: PRUEBAS DE RESEÑAS VISIBLES Y BÚSQUEDAS DEL CATÁLOGO
+// Reutiliza env, admin(), estudiante(), sembrarDeporteA1() de la suite.
+
+async function sembrarRevisionA36(codigo, uid = 'uid-a', oculta = false) {
+  await sembrarDeporteA1(codigo);
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'deportes', codigo, 'resenas', uid), {
+      estudianteNombre: 'Estudiante Uno', puntuacion: 4,
+      comentario: 'Clase de prueba', oculta, fecha: new Date(),
+    });
+  });
+}
+
+async function sembrarInscripcionA36(codigo, estado = 'confirmada', uid = 'uid-a') {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'inscripciones', `${uid}_${codigo}`), {
+      estudianteUid: uid, deporteId: codigo, estado,
+    });
+  });
+}
+
+const revisionA36 = (oculta = false) => ({
+  estudianteNombre: 'Estudiante Uno', puntuacion: 5,
+  comentario: 'Excelente clase', oculta, fecha: new Date(),
+});
+
+const busquedaA36 = (usuarioUid = null) => ({
+  termino: 'tenis', filtros: { disciplina: 'raqueta', turno: 'tarde', soloConCupo: true },
+  deporteIds: ['TEN-01'], usuarioUid, fecha: new Date(),
+});
+
+const anonimoA36 = () => env.unauthenticatedContext().firestore();
+
+test('A3.6: visitante puede leer reseña visible', async () => {
+  await sembrarRevisionA36('REV-01');
+  await assertSucceeds(getDoc(doc(anonimoA36(), 'deportes', 'REV-01', 'resenas', 'uid-a')));
+});
+
+test('A3.6: visitante no puede leer reseña oculta', async () => {
+  await sembrarRevisionA36('REV-02', 'uid-a', true);
+  await assertFails(getDoc(doc(anonimoA36(), 'deportes', 'REV-02', 'resenas', 'uid-a')));
+});
+
+test('A3.6: administrador puede consultar reseña oculta', async () => {
+  await sembrarRevisionA36('REV-14', 'uid-a', true);
+  await assertSucceeds(getDoc(doc(admin(), 'deportes', 'REV-14', 'resenas', 'uid-a')));
+});
+
+test('A3.6: visitante lista solamente reseñas con filtro oculta false', async () => {
+  await sembrarRevisionA36('REV-03');
+  await assertSucceeds(getDocs(query(
+    collection(anonimoA36(), 'deportes', 'REV-03', 'resenas'),
+    where('oculta', '==', false),
+  )));
+});
+
+test('A3.6: visitante no puede listar reseñas sin filtrar', async () => {
+  await assertFails(getDocs(collection(anonimoA36(), 'deportes', 'REV-03', 'resenas')));
+});
+
+test('A3.6: alumno con inscripción confirmada crea su reseña', async () => {
+  await sembrarDeporteA1('REV-04');
+  await sembrarInscripcionA36('REV-04');
+  await assertSucceeds(setDoc(doc(estudiante(), 'deportes', 'REV-04', 'resenas', 'uid-a'), revisionA36()));
+});
+
+test('A3.6: alumno con inscripción pendiente no puede reseñar', async () => {
+  await sembrarDeporteA1('REV-05');
+  await sembrarInscripcionA36('REV-05', 'pendiente');
+  await assertFails(setDoc(doc(estudiante(), 'deportes', 'REV-05', 'resenas', 'uid-a'), revisionA36()));
+});
+
+test('A3.6: alumno sin inscripción no puede reseñar', async () => {
+  await sembrarDeporteA1('REV-06');
+  await assertFails(setDoc(doc(estudiante(), 'deportes', 'REV-06', 'resenas', 'uid-a'), revisionA36()));
+});
+
+test('A3.6: alumno no puede crear reseña en el documento de otro UID', async () => {
+  await sembrarDeporteA1('REV-07');
+  await sembrarInscripcionA36('REV-07');
+  await assertFails(setDoc(doc(estudiante(), 'deportes', 'REV-07', 'resenas', 'uid-b'), revisionA36()));
+});
+
+test('A3.6: alumno no puede crear reseña ocultada', async () => {
+  await sembrarDeporteA1('REV-08');
+  await sembrarInscripcionA36('REV-08');
+  await assertFails(setDoc(doc(estudiante(), 'deportes', 'REV-08', 'resenas', 'uid-a'), revisionA36(true)));
+});
+
+test('A3.6: alumno no puede crear reseña con nota inválida', async () => {
+  await sembrarDeporteA1('REV-09');
+  await sembrarInscripcionA36('REV-09');
+  await assertFails(setDoc(doc(estudiante(), 'deportes', 'REV-09', 'resenas', 'uid-a'), {
+    ...revisionA36(), puntuacion: 6,
+  }));
+});
+
+test('A3.6: alumno no puede crear comentario excesivo', async () => {
+  await sembrarDeporteA1('REV-10');
+  await sembrarInscripcionA36('REV-10');
+  await assertFails(setDoc(doc(estudiante(), 'deportes', 'REV-10', 'resenas', 'uid-a'), {
+    ...revisionA36(), comentario: 'x'.repeat(301),
+  }));
+});
+
+test('A3.6: alumno confirmado modifica su comentario', async () => {
+  await sembrarRevisionA36('REV-11');
+  await sembrarInscripcionA36('REV-11');
+  await assertSucceeds(updateDoc(doc(estudiante(), 'deportes', 'REV-11', 'resenas', 'uid-a'), {
+    comentario: 'Comentario corregido', puntuacion: 3,
+  }));
+});
+
+test('A3.6: alumno no puede cambiar oculta', async () => {
+  await sembrarRevisionA36('REV-12');
+  await sembrarInscripcionA36('REV-12');
+  await assertFails(updateDoc(doc(estudiante(), 'deportes', 'REV-12', 'resenas', 'uid-a'), { oculta: true }));
+});
+
+test('A3.6: ni el estudiante confirmado puede falsificar promedio del deporte', async () => {
+  await sembrarDeporteA1('REV-13');
+  await sembrarInscripcionA36('REV-13');
+  await assertFails(updateDoc(doc(estudiante(), 'deportes', 'REV-13'), {
+    promedioCalificacion: 5, totalResenas: 500,
+  }));
+});
+
+test('A3.6: visitante anónimo puede registrar búsqueda sin UID', async () => {
+  await assertSucceeds(setDoc(doc(anonimoA36(), 'busquedas', 'a36-anon'), busquedaA36()));
+});
+
+test('A3.6: usuario autenticado puede registrar búsqueda con UID propio', async () => {
+  await assertSucceeds(setDoc(doc(estudiante(), 'busquedas', 'a36-owner'), busquedaA36('uid-a')));
+});
+
+test('A3.6: usuario autenticado puede registrar búsqueda sin UID', async () => {
+  await assertSucceeds(setDoc(doc(estudiante(), 'busquedas', 'a36-authanon'), busquedaA36()));
+});
+
+test('A3.6: visitante no puede atribuir una búsqueda a un usuario', async () => {
+  await assertFails(setDoc(doc(anonimoA36(), 'busquedas', 'a36-fake-anon'), busquedaA36('uid-a')));
+});
+
+test('A3.6: usuario no puede atribuir búsqueda a otro UID', async () => {
+  await assertFails(setDoc(doc(estudiante(), 'busquedas', 'a36-fake-owner'), busquedaA36('uid-b')));
+});
+
+test('A3.6: búsqueda con fecha demasiado antigua es rechazada', async () => {
+  await assertFails(setDoc(doc(anonimoA36(), 'busquedas', 'a36-old'), {
+    ...busquedaA36(), fecha: new Date('2020-01-01T00:00:00Z'),
+  }));
+});
+
+test('A3.6: búsqueda con filtro de tipo incorrecto se rechaza', async () => {
+  await assertFails(setDoc(doc(anonimoA36(), 'busquedas', 'a36-filter'), {
+    ...busquedaA36(), filtros: { soloConCupo: 'si' },
+  }));
+});
+
+test('A3.6: búsqueda con lista enorme se rechaza', async () => {
+  await assertFails(setDoc(doc(anonimoA36(), 'busquedas', 'a36-big'), {
+    ...busquedaA36(), deporteIds: Array.from({ length: 51 }, (_, i) => `DEP-${i}`),
+  }));
+});
+
+test('A3.6: visitante no puede leer búsquedas', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'busquedas', 'a36-read-deny'), busquedaA36());
+  });
+  await assertFails(getDoc(doc(anonimoA36(), 'busquedas', 'a36-read-deny')));
+});
+
+test('A3.6: estudiante no puede editar búsquedas existentes', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'busquedas', 'a36-update-deny'), busquedaA36('uid-a'));
+  });
+  await assertFails(updateDoc(doc(estudiante(), 'busquedas', 'a36-update-deny'), { termino: 'otra' }));
+});
