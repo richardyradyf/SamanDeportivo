@@ -433,10 +433,14 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // A3.6: público solo ve reseñas visibles; admin ve todas.
-      // Importante: las consultas públicas deben usar where('oculta', isEqualTo: false).
+      // A3.6: el propietario puede leer su documento (incluso si no existe
+      // o está oculto); el público solo ve reseñas visibles y el admin todas.
+      // Las consultas de colección siguen exigiendo el filtro de visibilidad.
       match /resenas/{estudianteUid} {
-        allow get, list: if esAdministrador()
+        allow get: if esAdministrador()
+          || (autenticado() && request.auth.uid == estudianteUid)
+          || (resource != null && resource.data.oculta == false);
+        allow list: if esAdministrador()
           || resource.data.oculta == false;
 
         // ID de documento = UID del autor. Una resena nueva se guarda con

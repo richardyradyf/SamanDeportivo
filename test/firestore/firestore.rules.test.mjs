@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, writeBatch, serverTimestamp, runTransaction } from 'firebase/firestore';
 
 let env;
 const datosA = {
@@ -482,6 +482,61 @@ const busquedaA36 = (usuarioUid = null) => ({
 });
 
 const anonimoA36 = () => env.unauthenticatedContext().firestore();
+
+// Regresión: el repositorio Flutter hace tx.get() sobre la reseña nueva
+// ANTES de escribirla. Un writeBatch por sí solo no detecta ese permiso.
+test('Spark fix: estudiante puede leer su propia reseña aún inexistente', async () => {
+  await sembrarDeporteA1('REV-41');
+  const foto = await assertSucceeds(getDoc(
+    doc(estudiante(), 'deportes', 'REV-41', 'resenas', 'uid-a'),
+  ));
+  if (foto.exists()) throw new Error('La reseña debía estar ausente');
+});
+
+test('Spark fix: estudiante puede leer su propia reseña oculta', async () => {
+  await sembrarRevisionA36('REV-42', 'uid-a', true);
+  const foto = await assertSucceeds(getDoc(
+    doc(estudiante(), 'deportes', 'REV-42', 'resenas', 'uid-a'),
+  ));
+  if (!foto.exists() || foto.data().oculta !== true) {
+    throw new Error('No se pudo leer la reseña propia oculta');
+  }
+});
+
+test('Spark fix: estudiante NO puede leer reseña ajena inexistente', async () => {
+  await sembrarDeporteA1('REV-43');
+  await assertFails(getDoc(
+    doc(estudiante(), 'deportes', 'REV-43', 'resenas', 'uid-b'),
+  ));
+});
+
+test('Spark fix: estudiante NO puede leer reseña ajena oculta', async () => {
+  await sembrarRevisionA36('REV-44', 'uid-b', true);
+  await assertFails(getDoc(
+    doc(estudiante(), 'deportes', 'REV-44', 'resenas', 'uid-b'),
+  ));
+});
+
+test('Spark fix: primera reseña se crea con transacción que lee documento ausente', async () => {
+  await sembrarDeporteA1('REV-45');
+  await sembrarInscripcionA36('REV-45');
+  const db = estudiante();
+  const deporteRef = doc(db, 'deportes', 'REV-45');
+  const resenaRef = doc(db, 'deportes', 'REV-45', 'resenas', 'uid-a');
+  await assertSucceeds(runTransaction(db, async (tx) => {
+    const fotoDeporte = await tx.get(deporteRef);
+    const fotoResena = await tx.get(resenaRef);
+    if (!fotoDeporte.exists() || fotoResena.exists()) {
+      throw new Error('Estado inicial inesperado');
+    }
+    tx.set(resenaRef, revisionA36());
+    tx.update(deporteRef, { promedioCalificacion: 5, totalResenas: 1 });
+  }));
+  const foto = await getDoc(resenaRef);
+  if (!foto.exists() || foto.data().puntuacion !== 5) {
+    throw new Error('La primera reseña no se guardó');
+  }
+});
 
 test('A3.6: visitante puede leer reseña visible', async () => {
   await sembrarRevisionA36('REV-01');
