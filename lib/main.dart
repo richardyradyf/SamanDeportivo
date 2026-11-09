@@ -7,9 +7,9 @@ import 'core/config/entorno.dart';
 import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
 import 'features/auth/controllers/sesion_controller.dart';
-import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/registro_screen.dart';
 import 'core/theme/app_theme.dart';
+import 'features/publico/inicio_publico.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,7 +46,8 @@ class SamanDeportivoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.claro,
       home: AuthGate(
-        sinSesion: const LoginScreen(),
+        // Sin sesión se ve el landing con el catálogo público (Hito 4).
+        sinSesion: const InicioPublico(),
         obtenerInscripciones:
             FirestoreInscripcionRepository().observarDeEstudiante,
         cancelarInscripcion: FirestoreInscripcionRepository().cancelar,
