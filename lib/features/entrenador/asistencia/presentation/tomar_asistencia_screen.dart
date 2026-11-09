@@ -167,6 +167,22 @@ class _SesionState extends State<_Sesion> {
               }
               return ListView(
                 children: [
+                  // Como en el Figma: lo normal es que casi todos vengan, así
+                  // que se marcan todos y se desmarca a los que faltaron.
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: OutlinedButton(
+                        onPressed: () => setState(() {
+                          for (final i in lista) {
+                            _presentes[i.estudianteUid] = true;
+                          }
+                        }),
+                        child: const Text('Marcar todos presentes'),
+                      ),
+                    ),
+                  ),
                   for (final i in lista)
                     SwitchListTile(
                       title: Text(i.estudianteNombre),
