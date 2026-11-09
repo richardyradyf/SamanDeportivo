@@ -3,7 +3,7 @@ import 'package:saman_deportivo/features/admin/dashboard/presentation/analitica_
 import 'package:firebase_core/firebase_core.dart';
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/data/firestore_entrenador_repository.dart';
-import 'package:saman_deportivo/features/admin/entrenadores/data/firebase_agenda_gateway.dart';
+import 'package:saman_deportivo/features/admin/entrenadores/data/firestore_agenda_gateway.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/presentation/entrenadores_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/presentation/horarios_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/deportes/presentation/deportes_admin_screen.dart';
@@ -72,7 +72,7 @@ class InicioAdminScreen extends StatelessWidget {
               : HorariosAdminScreen(
                   deportes: FirestoreDeporteRepository(),
                   entrenadores: FirestoreEntrenadorRepository(),
-                  agendaGateway: FirebaseAgendaGateway(),
+                  agendaGateway: FirestoreAgendaGateway(),
                 ),
         ),
         const DestinoNavegacion(

@@ -114,22 +114,3 @@ exports.guardarAgendaDeporte = onCall(callableOptions, async (request) => {
     return {ok:true};
   } catch(error) {throw errorNegocio(error);}
 });
-
-// A3.7 — Recalcula los indicadores después de cualquier creación, edición o
-// moderación de una reseña. No autoriza escrituras de clientes en el deporte.
-// Trigger asíncrono: el promedio puede tardar brevemente en reflejar cambios.
-const {onDocumentWritten} = require('firebase-functions/v2/firestore');
-const {recalcularIndicadoresResenas} = require('./lib/indicadores_resenas.cjs');
-
-exports.recalcularCalificacionesDeporte = onDocumentWritten({
-  document: 'deportes/{codigo}/resenas/{estudianteUid}',
-  region: 'us-central1',
-  maxInstances: 10,
-  retry: true,
-}, async (event) => {
-  const codigo = event.params?.codigo;
-  const resultado = await recalcularIndicadoresResenas(db, codigo);
-  if (resultado.invalidas) {
-    console.warn(`Deporte ${codigo}: ${resultado.invalidas} reseña(s) inválida(s) excluida(s) del promedio.`);
-  }
-});
