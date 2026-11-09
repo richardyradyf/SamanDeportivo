@@ -1,6 +1,7 @@
 import '../models/deporte.dart';
 import '../models/estudiante.dart';
 import '../models/inscripcion.dart';
+import '../models/pago.dart';
 
 /// Error de negocio al inscribirse o cambiar de estado.
 /// El [mensaje] se puede mostrar tal cual en la pantalla.
@@ -51,8 +52,12 @@ abstract class InscripcionRepository {
   /// El estudiante cancela; libera el cupo (RF-09).
   Future<void> cancelar(String inscripcionId, {required String responsableUid});
 
-  /// Pago aprobado: pasa a `confirmada` (RF-11). La llama el módulo de pagos.
-  Future<void> confirmar(String inscripcionId, {required String pagoId});
+  /// Pago aprobado en PayPal (RF-11). La llama el módulo de pagos.
+  /// En una sola transacción crea `pagos/{pago.id}` (aprobado, con orderId y
+  /// captureId), pasa la inscripción a `confirmada` y suma 1 a
+  /// `cuposConfirmados`. Sin Cloud Functions, las reglas exigen que las tres
+  /// escrituras vayan juntas. Lanza [InscripcionException] si no se puede.
+  Future<void> confirmar(String inscripcionId, {required Pago pago});
 
   /// Pago fallido o fuera de plazo: pasa a `expirada` y libera el cupo.
   /// La llama el módulo de pagos o [expirarVencidas].

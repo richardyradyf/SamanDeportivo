@@ -1,17 +1,20 @@
-
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 
 import {
   initializeTestEnvironment,
   assertFails,
+  assertSucceeds,
 } from '@firebase/rules-unit-testing';
 
 import {
+  arrayUnion,
   doc,
   getDoc,
   setDoc,
+  Timestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 
 let env;
@@ -32,8 +35,9 @@ before(async () => {
     await setDoc(doc(db, 'deportes', 'TEN-01'), {
       codigo: 'TEN-01',
       nombre: 'Tenis',
+      costo: 10,
       cupoMaximo: 2,
-      cuposOcupados: 1,
+      cuposOcupados: 2,
       cuposConfirmados: 0,
       activo: true,
     });
@@ -46,6 +50,16 @@ before(async () => {
         estado: 'pendiente',
       },
     );
+
+    // Inscripción pendiente propia de uid-a, para las pruebas de pago.
+    await setDoc(doc(db, 'inscripciones', 'uid-a_TEN-01'), {
+      estudianteUid: 'uid-a',
+      deporteId: 'TEN-01',
+      estado: 'pendiente',
+      pagoId: null,
+      fechaLimitePago: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+      historial: [],
+    });
 
     await setDoc(doc(db, 'usuarios', 'uid-a'), {
       cedula: '12345678',
@@ -71,6 +85,34 @@ const estudiante = () =>
 
 const anonimo = () =>
   env.unauthenticatedContext().firestore();
+
+// Pago, confirmación y cupo en una sola escritura, como lo hace la app.
+function pagarYConfirmar(db, { orden, monto }) {
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'pagos', orden), {
+    inscripcionId: 'uid-a_TEN-01',
+    estudianteUid: 'uid-a',
+    deporteId: 'TEN-01',
+    deporteNombre: 'Tenis',
+    paypalOrderId: orden,
+    paypalCaptureId: `CAPTURA-${orden}`,
+    monto,
+    moneda: 'USD',
+    estado: 'aprobado',
+    fecha: Timestamp.now(),
+  });
+  lote.update(doc(db, 'inscripciones', 'uid-a_TEN-01'), {
+    estado: 'confirmada',
+    pagoId: orden,
+    historial: arrayUnion({
+      estado: 'confirmada',
+      fecha: Timestamp.now(),
+      responsableUid: 'uid-a',
+    }),
+  });
+  lote.update(doc(db, 'deportes', 'TEN-01'), { cuposConfirmados: 1 });
+  return lote.commit();
+}
 
 // SEG-01
 test('Usuario sin sesion no puede crear inscripciones', async () => {
@@ -108,11 +150,12 @@ test('Estudiante no puede alterar manualmente los cupos', async () => {
 });
 
 // SEG-04
-test('Estudiante no puede confirmar pagos manualmente', async () => {
+test('Estudiante no puede confirmar sin un pago válido', async () => {
   const db = estudiante();
 
+  // Su propia inscripción pendiente, con un pagoId que no existe.
   await assertFails(
-    updateDoc(doc(db, 'inscripciones', 'uid-b_TEN-01'), {
+    updateDoc(doc(db, 'inscripciones', 'uid-a_TEN-01'), {
       estado: 'confirmada',
       pagoId: 'PAGO_FALSO',
     }),
@@ -126,4 +169,18 @@ test('Estudiante no puede leer inscripciones ajenas', async () => {
   await assertFails(
     getDoc(doc(db, 'inscripciones', 'uid-b_TEN-01')),
   );
+});
+
+// SEG-06
+test('Estudiante no puede pagar un monto distinto al costo del deporte', async () => {
+  const db = estudiante();
+
+  await assertFails(pagarYConfirmar(db, { orden: 'ORDEN-BARATA', monto: 1 }));
+});
+
+// SEG-07 (va de último: deja la inscripción confirmada)
+test('Estudiante confirma su inscripción con un pago válido', async () => {
+  const db = estudiante();
+
+  await assertSucceeds(pagarYConfirmar(db, { orden: 'ORDEN-OK', monto: 10 }));
 });

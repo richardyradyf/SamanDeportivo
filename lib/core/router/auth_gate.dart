@@ -6,6 +6,7 @@ import 'package:saman_deportivo/features/auth/controllers/sesion_controller.dart
 import 'package:saman_deportivo/features/entrenador/entrenador_firebase.dart';
 import 'package:saman_deportivo/features/entrenador/screens/inicio_entrenador_screen.dart';
 import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_screen.dart';
+import 'package:saman_deportivo/features/pagos/presentation/pagos_estudiante_seccion.dart';
 import 'package:saman_deportivo/features/perfil/presentation/perfil_screen.dart';
 
 import 'package:saman_deportivo/models/enums.dart';
@@ -15,10 +16,14 @@ import 'package:saman_deportivo/models/inscripcion.dart';
 import 'package:saman_deportivo/models/persona.dart';
 import 'package:saman_deportivo/repositories/inscripcion_repository.dart';
 
+/// Construye la pestaña "Perfil" para la persona en sesión.
 typedef ConstructorPerfil = Widget Function(
   Persona persona,
   SesionController sesion,
 );
+
+/// Construye la pantalla de pagos del estudiante en sesión.
+typedef ConstructorPagos = Widget Function(Persona persona);
 
 typedef ObtenerInscripciones = Stream<List<Inscripcion>> Function(
   String estudianteUid,
@@ -34,11 +39,19 @@ typedef InscribirEstudiante = Future<Inscripcion> Function({
   required Deporte deporte,
 });
 
+/// Puerta de entrada de la app: escucha al [SesionController] y decide
+/// qué pantalla mostrar según el estado de la sesión y el rol.
+///
+/// - cargando     → indicador de carga
+/// - sinSesion    → [sinSesion] (bienvenida o login)
+/// - sinPerfil    → mensaje de error con opción de cerrar sesión
+/// - autenticado  → inicio del estudiante, entrenador o administrador
 class AuthGate extends StatelessWidget {
   const AuthGate({
     super.key,
     required this.sinSesion,
     this.construirPerfil = _perfilDeFirestore,
+    this.construirPagos = _pagosDeFirestore,
     this.obtenerInscripciones,
     this.cancelarInscripcion,
     this.inscribirEstudiante,
@@ -46,6 +59,10 @@ class AuthGate extends StatelessWidget {
 
   final Widget sinSesion;
   final ConstructorPerfil construirPerfil;
+
+  /// Igual que [construirPerfil], para la pantalla de pagos del estudiante.
+  final ConstructorPagos construirPagos;
+
   final ObtenerInscripciones? obtenerInscripciones;
 
   /// Función opcional para cancelar una inscripción.
@@ -57,6 +74,13 @@ class AuthGate extends StatelessWidget {
       key: ValueKey(persona.uid),
       uid: persona.uid,
       cerrarSesion: sesion.cerrarSesion,
+    );
+  }
+
+  static Widget _pagosDeFirestore(Persona persona) {
+    return PagosEstudianteFirebase(
+      key: ValueKey(persona.uid),
+      uid: persona.uid,
     );
   }
 
@@ -105,6 +129,7 @@ class AuthGate extends StatelessWidget {
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+        pagos: construirPagos(persona),
         inscripcionesStream: obtenerInscripciones?.call(persona.uid),
         onCancelarInscripcion: cancelarInscripcion == null
             ? null

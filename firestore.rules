@@ -540,6 +540,72 @@ service cloud.firestore {
         && getAfter(rutaDeporte(d.codigoDeporte)).data.actualizadoEn == request.time;
     }
 
+    // H3 Andrés — Pagos con PayPal JS SDK (sin Cloud Functions).
+    // La app registra el pago capturado en el navegador. Estas reglas
+    // obligan a que pago, confirmación y cupo se escriban juntos.
+    // rutaInscripcion() está definida más abajo, junto a las reglas de asistencia.
+    function rutaPago(id) {
+      return /databases/$(database)/documents/pagos/$(id);
+    }
+
+    function pagoValido(pagoId) {
+      let p = request.resource.data;
+      return autenticado()
+        && p.keys().hasAll([
+          'inscripcionId', 'estudianteUid', 'deporteId', 'deporteNombre',
+          'paypalOrderId', 'paypalCaptureId', 'monto', 'moneda', 'estado', 'fecha'
+        ])
+        && p.keys().hasOnly([
+          'inscripcionId', 'estudianteUid', 'deporteId', 'deporteNombre',
+          'paypalOrderId', 'paypalCaptureId', 'monto', 'moneda', 'estado', 'fecha'
+        ])
+        && p.estudianteUid == request.auth.uid
+        && p.paypalOrderId == pagoId
+        && p.paypalCaptureId is string && p.paypalCaptureId.size() > 0
+        && p.estado == 'aprobado'
+        && p.moneda == 'USD'
+        && p.inscripcionId == request.auth.uid + '_' + p.deporteId
+        && p.monto is number
+        && p.monto == get(rutaDeporte(p.deporteId)).data.costo
+        && p.fecha is timestamp
+        && p.fecha >= request.time - duration.value(10, 'm')
+        && p.fecha <= request.time + duration.value(10, 'm')
+        && getAfter(rutaInscripcion(p.inscripcionId)).data.estado == 'confirmada'
+        && getAfter(rutaInscripcion(p.inscripcionId)).data.pagoId == pagoId;
+    }
+
+    // H3 Andrés — De pendiente a confirmada solo si el pago se crea en esta
+    // misma escritura.
+    function confirmacionPagada(inscripcionId) {
+      let antes = resource.data;
+      let despues = request.resource.data;
+      return autenticado()
+        && antes.estudianteUid == request.auth.uid
+        && antes.estado == 'pendiente'
+        && request.time < antes.fechaLimitePago
+        && despues.estado == 'confirmada'
+        && despues.diff(antes).affectedKeys().hasOnly(['estado', 'pagoId', 'historial'])
+        && despues.pagoId is string
+        && !exists(rutaPago(despues.pagoId))
+        && existsAfter(rutaPago(despues.pagoId))
+        && getAfter(rutaPago(despues.pagoId)).data.inscripcionId == inscripcionId
+        && getAfter(rutaPago(despues.pagoId)).data.estudianteUid == request.auth.uid;
+    }
+
+    // H3 Andrés — Solo +1 en cuposConfirmados cuando la inscripción del propio
+    // estudiante pasa de pendiente a confirmada en la misma escritura.
+    function cupoConfirmadoPorPago(codigo) {
+      let antes = resource.data;
+      let despues = request.resource.data;
+      let inscripcion = rutaInscripcion(request.auth.uid + '_' + codigo);
+      return autenticado()
+        && despues.diff(antes).affectedKeys().hasOnly(['cuposConfirmados'])
+        && despues.cuposConfirmados == antes.cuposConfirmados + 1
+        && despues.cuposConfirmados <= antes.cuposOcupados
+        && get(inscripcion).data.estado == 'pendiente'
+        && getAfter(inscripcion).data.estado == 'confirmada';
+    }
+
     // INS Spark: solo reservas y cancelaciones vinculadas en la misma operacion.
     // Mantener separadas las condiciones comerciales, de agenda y de resenas.
     function actualizacionCuposInscripcion(codigo) {
@@ -1053,6 +1119,9 @@ service cloud.firestore {
         )
       ) && datosDeporteValidos(codigo);
 
+      // H3 Andrés: el estudiante suma su cupo confirmado al pagar.
+      allow update: if cupoConfirmadoPorPago(codigo);
+
       allow delete: if false;
 
       // A3.6: el propietario puede leer su documento (incluso si no existe
@@ -1122,6 +1191,8 @@ service cloud.firestore {
         || reinscripcionPropiaValida(inscripcionId)
         || expiracionPropiaValida(inscripcionId)
         || rechazoPropioValido(inscripcionId);
+      // H3 Andrés: confirmación con pago en la misma escritura (RF-11).
+      allow update: if confirmacionPagada(inscripcionId);
       allow delete: if false;
     }
 
@@ -1129,6 +1200,8 @@ service cloud.firestore {
       allow get, list: if esAdministrador()
         || (autenticado() && resource.data.estudianteUid == request.auth.uid);
       allow create, update, delete: if false;
+      // H3 Andrés: el ID es el orderId; nunca se edita ni se borra.
+      allow create: if pagoValido(pagoId);
     }
 
     // A2 Spark: un unico contador global para serializar agendas.
