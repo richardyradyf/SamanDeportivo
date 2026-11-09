@@ -88,12 +88,22 @@ conviene subirlas en JPG o WebP de máximo 1600 px de ancho.
 
 ## Resultados
 
-Fecha de la medición: ________
+Fecha de la medición: 9 de noviembre de 2026, en una MacBook Pro M1, con el
+emulador de Firebase en la misma computadora y la app en modo perfil
+(`flutter run -d chrome --profile --dart-define=USAR_EMULADOR=true`).
 
 | Medición | Resultado | Límite | ¿Cumple? |
 |---|---|---|---|
-| Landing: deportes visibles (promedio de 5) | | 3000 ms | |
-| Lighthouse computadora: Largest Contentful Paint | | 3000 ms | |
-| Lighthouse móvil: Largest Contentful Paint | | 3000 ms | |
-| Cupos en el emulador: máximo de 20 | | 2000 ms | |
-| Cupos con la base real: promedio de 5 | | 2000 ms | |
+| Landing: deportes visibles (promedio de 5) | 73 ms (100, 110, 36, 84 y 36 ms) | 3000 ms | Sí |
+| Landing: desde que se abre la página hasta ver los deportes (promedio de 5) | 1,2 s; la más lenta, 2,2 s | 3000 ms | Sí |
+| Lighthouse computadora: Largest Contentful Paint | Pendiente: falta la app publicada en Hosting | 3000 ms | |
+| Lighthouse móvil: Largest Contentful Paint | Pendiente: falta la app publicada en Hosting | 3000 ms | |
+| Cupos en el emulador: máximo de 20 | 27 ms (promedio 4 ms; 95 %: 4 ms) | 2000 ms | Sí |
+| Cupos con la base real: promedio de 5 | Pendiente: falta la app publicada en Hosting | 2000 ms | |
+
+Cómo se sacó la segunda fila: la línea `[rendimiento]` mide desde que se abre
+la pantalla del landing, no desde que se abre la página. Para el tiempo
+completo se sumó, en cada carga, el momento en que la app abre la conexión
+con Firestore (Resource Timing del navegador) y la medición interna. La
+primera carga fue la más lenta porque el navegador todavía no tenía en caché
+el motor gráfico de Flutter.

@@ -18,6 +18,9 @@ before(async () => {
   });
   await env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), 'usuarios', 'uid-a'), datosA);
+    await setDoc(doc(ctx.firestore(), 'carnets', '202611111'), {
+      uid: 'uid-a',
+    });
     await setDoc(doc(ctx.firestore(), 'usuarios', 'uid-b'), datosB);
     await setDoc(doc(ctx.firestore(), 'usuarios', 'uid-admin'), {
       ...datosA, nombre: 'Administradora', correo: 'admin@unimet.edu.ve',
@@ -40,9 +43,21 @@ test('estudiante NO lee el perfil ajeno', async () => {
 });
 
 test('estudiante cambia solamente nombre y carnet', async () => {
-  await assertSucceeds(updateDoc(doc(estudiante(), 'usuarios', 'uid-a'), {
-    nombre: 'Estudiante Modificado', carnet: '202633333',
-  }));
+  const db = estudiante();
+  const batch = writeBatch(db);
+
+  batch.set(doc(db, 'carnets', '202633333'), {
+    uid: 'uid-a',
+  });
+
+  batch.update(doc(db, 'usuarios', 'uid-a'), {
+    nombre: 'Estudiante Modificado',
+    carnet: '202633333',
+  });
+
+  batch.delete(doc(db, 'carnets', '202611111'));
+
+  await assertSucceeds(batch.commit());
 });
 
 test('estudiante NO puede convertirse en administrador', async () => {
@@ -144,9 +159,17 @@ test('estudiante puede registrarse activo con los 6 campos acordados', async () 
     email: 'registro@unimet.edu.ve',
   }).firestore();
 
-  await assertSucceeds(
-    setDoc(doc(db, 'usuarios', uid), nuevoRegistro()),
-  );
+  const batch = writeBatch(db);
+
+  batch.set(doc(db, 'usuarios', uid), {
+    ...nuevoRegistro(),
+    cedula: '28111999',
+  });
+
+  batch.set(doc(db, 'cedulas', '28111999'), { uid });
+  batch.set(doc(db, 'carnets', '202644444'), { uid });
+
+  await assertSucceeds(batch.commit());
 });
 
 test('estudiante NO puede registrarse como inactivo', async () => {

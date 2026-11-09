@@ -36,3 +36,13 @@ int porcentajeAsistencia(List<Asistencia> registros) => registros.isEmpty
     ? 0
     : (100 * registros.where((a) => a.estuvoPresente).length / registros.length)
         .round();
+
+/// Parte [lista] en grupos de [tamano] elementos, en el mismo orden. El último
+/// grupo puede quedar más corto.
+List<List<T>> dividirEnLotes<T>(List<T> lista, int tamano) {
+  if (tamano < 1) throw ArgumentError.value(tamano, 'tamano', 'debe ser al menos 1');
+  return [
+    for (var inicio = 0; inicio < lista.length; inicio += tamano)
+      lista.sublist(inicio, inicio + tamano > lista.length ? lista.length : inicio + tamano),
+  ];
+}

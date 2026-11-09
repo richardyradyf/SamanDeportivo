@@ -10,10 +10,12 @@ import 'package:saman_deportivo/features/estudiante/catalogo/catalogo_screen.dar
 import 'package:saman_deportivo/features/estudiante/catalogo/detalle_deporte_screen.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/permiso_resena.dart';
 import 'package:saman_deportivo/features/estudiante/inscripciones/screens/mis_inscripciones_screen.dart';
+import 'package:saman_deportivo/features/estudiante/mis_deportes/mis_deportes_screen.dart';
 import 'package:saman_deportivo/features/estudiante/widgets/sin_inscripciones_card.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/inscripcion.dart';
+import 'package:saman_deportivo/repositories/asistencia_repository.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 import 'package:saman_deportivo/repositories/resena_repository.dart';
 
@@ -37,6 +39,7 @@ class InicioEstudianteScreen extends StatefulWidget {
     this.resenas,
     this.uid,
     this.onInscribirse,
+    this.asistencias,
   });
 
   final String nombre;
@@ -62,7 +65,13 @@ class InicioEstudianteScreen extends StatefulWidget {
   final String? uid;
   final Future<Inscripcion> Function(Deporte deporte)? onInscribirse;
 
+  /// Asistencia del estudiante, para "Mis deportes" (registrada por el
+  /// entrenador). Sin Firebase, en las pruebas, se pasa una falsa.
+  final AsistenciaRepository? asistencias;
+
   static const indiceExplorar = 1;
+  static const indiceMisDeportes = 2;
+  static const indiceInscripciones = 3;
 
   @override
   State<InicioEstudianteScreen> createState() => _InicioEstudianteScreenState();
@@ -233,15 +242,39 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
           etiqueta: 'Inicio',
           icono: Icons.home_outlined,
           iconoSeleccionado: Icons.home,
+          // Como en el Figma: con deportes confirmados, la próxima sesión y
+          // "Mis disciplinas"; sin ellos, la invitación a explorar.
           pantalla: Builder(
-            builder: (context) => PanelBienvenida(
-              saludo: '$saludo 👋',
-              contenido: SinInscripcionesCard(
-                onExplorar: () => LayoutResponsivo.irA(
-                  context,
-                  InicioEstudianteScreen.indiceExplorar,
-                ),
-              ),
+            builder: (context) => ValueListenableBuilder<List<Inscripcion>?>(
+              valueListenable: _inscripciones,
+              builder: (context, inscripciones, _) {
+                final tieneConfirmadas =
+                    inscripciones?.any(
+                      (i) => i.estado == EstadoInscripcion.confirmada,
+                    ) ??
+                    false;
+                return PanelBienvenida(
+                  saludo: '$saludo 👋',
+                  contenido: tieneConfirmadas
+                      ? ResumenMisDeportes(
+                          inscripciones: inscripciones,
+                          deportes: widget.deportes,
+                          reloj: widget.reloj,
+                          onVerDeporte: (deporte) =>
+                              _verDeporte(context, deporte),
+                          onVerInscripciones: () => LayoutResponsivo.irA(
+                            context,
+                            InicioEstudianteScreen.indiceInscripciones,
+                          ),
+                        )
+                      : SinInscripcionesCard(
+                          onExplorar: () => LayoutResponsivo.irA(
+                            context,
+                            InicioEstudianteScreen.indiceExplorar,
+                          ),
+                        ),
+                );
+              },
             ),
           ),
         ),
@@ -258,13 +291,34 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
           ),
         ),
 
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Mis deportes',
           icono: Icons.sports_soccer_outlined,
           iconoSeleccionado: Icons.sports_soccer,
-          pantalla: SeccionPendiente(
-            titulo: 'Mis deportes',
-            icono: Icons.sports_soccer,
+          pantalla: Builder(
+            builder: (context) => ValueListenableBuilder<List<Inscripcion>?>(
+              valueListenable: _inscripciones,
+              // Sin stream de inscripciones (en algunas pruebas) no hay nada
+              // que esperar: se muestra como lista vacía.
+              builder: (context, inscripciones, _) => MisDeportesScreen(
+                inscripciones: widget.inscripcionesStream == null
+                    ? const []
+                    : inscripciones,
+                deportes: widget.deportes,
+                asistencias: widget.asistencias,
+                estudianteUid: widget.uid,
+                reloj: widget.reloj,
+                onVerDeporte: (deporte) => _verDeporte(context, deporte),
+                onExplorar: () => LayoutResponsivo.irA(
+                  context,
+                  InicioEstudianteScreen.indiceExplorar,
+                ),
+                onVerInscripciones: () => LayoutResponsivo.irA(
+                  context,
+                  InicioEstudianteScreen.indiceInscripciones,
+                ),
+              ),
+            ),
           ),
         ),
 

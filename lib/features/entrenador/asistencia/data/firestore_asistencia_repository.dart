@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:saman_deportivo/features/entrenador/asistencia/domain/resumen_asistencia.dart';
 import 'package:saman_deportivo/models/asistencia.dart';
 import 'package:saman_deportivo/repositories/asistencia_repository.dart';
 
@@ -14,13 +15,22 @@ class FirestoreAsistenciaRepository implements AsistenciaRepository {
   /// entrenador: las reglas de seguridad lo exigen.
   final String? entrenadorUid;
 
+  /// Registros por lote. Las reglas leen el deporte y la inscripción de cada
+  /// registro, y Firestore permite 20 lecturas por lote: con 8 queda margen.
+  static const int registrosPorLote = 8;
+
+  /// Guarda la lista en lotes de [registrosPorLote]. Si un lote falla, los
+  /// anteriores ya quedaron guardados; volver a guardar la sesión completa
+  /// es seguro, porque cada registro tiene un ID fijo y se reemplaza.
   @override
   Future<void> guardarSesion(List<Asistencia> registros) async {
-    final lote = _asistencias.firestore.batch();
-    for (final a in registros) {
-      lote.set(_asistencias.doc(a.id), a.toMap());
+    for (final grupo in dividirEnLotes(registros, registrosPorLote)) {
+      final lote = _asistencias.firestore.batch();
+      for (final a in grupo) {
+        lote.set(_asistencias.doc(a.id), a.toMap());
+      }
+      await lote.commit();
     }
-    await lote.commit();
   }
 
   Stream<List<Asistencia>> _entre(
