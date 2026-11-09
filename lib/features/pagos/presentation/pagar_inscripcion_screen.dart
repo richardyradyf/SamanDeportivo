@@ -1,120 +1,220 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../models/inscripcion.dart';
-import '../data/paypal_gateway.dart';
+import 'package:saman_deportivo/features/pagos/domain/resultado_paypal.dart';
+import 'package:saman_deportivo/features/pagos/presentation/vista_paypal.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
+import 'package:saman_deportivo/repositories/inscripcion_repository.dart';
 
-/// Pago de una inscripción pendiente. Devuelve `true` al cerrarse si se aprobó.
+/// Registra un pago aprobado: crea el pago y confirma la inscripción.
+typedef ConfirmarPago = Future<void> Function(
+  Inscripcion inscripcion,
+  ResultadoPaypal resultado,
+  double monto,
+);
+
+/// Construye la vista de PayPal. En las pruebas se pasa una falsa.
+typedef ConstructorVistaPaypal = Widget Function(
+  Uri url,
+  ValueChanged<ResultadoPaypal> onTerminar,
+);
+
+/// Pago de una inscripción pendiente con PayPal (RF-11).
+/// Muestra pagar.html (botones del JS SDK) y, si PayPal aprueba, registra
+/// el pago con [confirmar]. Devuelve `true` al cerrarse si quedó registrado.
 class PagarInscripcionScreen extends StatefulWidget {
   const PagarInscripcionScreen({
     super.key,
     required this.inscripcion,
-    this.monto,
-    this.gateway,
-    this.abrirUrl,
+    required this.monto,
+    required this.confirmar,
+    this.construirVista,
   });
 
   final Inscripcion inscripcion;
 
-  /// Solo se muestra; el monto real lo decide el servidor.
-  final double? monto;
-  final PagoGateway? gateway;
-  final Future<bool> Function(Uri)? abrirUrl;
+  /// Costo del deporte. Es lo que se cobra y lo que validan las reglas.
+  final double monto;
+  final ConfirmarPago confirmar;
+  final ConstructorVistaPaypal? construirVista;
 
   @override
   State<PagarInscripcionScreen> createState() => _PagarInscripcionScreenState();
 }
 
 class _PagarInscripcionScreenState extends State<PagarInscripcionScreen> {
-  late final PagoGateway _gateway = widget.gateway ?? PaypalGateway();
-  String? _pagoId;
-  String? _mensaje;
-  bool _error = false;
-  bool _cargando = false;
-  bool _confirmado = false;
+  late final Uri _url = urlPagar(
+    inscripcionId: widget.inscripcion.id,
+    monto: widget.monto,
+    deporte: widget.inscripcion.deporteNombre,
+  );
 
-  Future<void> _ejecutar(Future<String> Function() accion) async {
+  int _intento = 0;
+  bool _mostrarPaypal = true;
+  bool _guardando = false;
+  bool _aprobado = false;
+  bool _error = false;
+  String? _mensaje;
+
+  /// Pago que PayPal ya cobró pero que todavía no se pudo registrar.
+  ResultadoPaypal? _sinRegistrar;
+
+  void _mostrar(String mensaje, {required bool error}) {
     setState(() {
-      _cargando = true;
+      _mostrarPaypal = false;
+      _mensaje = mensaje;
+      _error = error;
+    });
+  }
+
+  void _alTerminar(ResultadoPaypal resultado) {
+    if (!mounted) return;
+    if (resultado.cancelado) {
+      _mostrar('Cancelaste el pago. No se cobró nada.', error: false);
+      return;
+    }
+    if (!resultado.completado) {
+      _mostrar('PayPal no completó el pago. Puedes intentarlo de nuevo.',
+          error: true);
+      return;
+    }
+    final cobrado = resultado.monto;
+    if (cobrado != null && (cobrado - widget.monto).abs() > 0.005) {
+      _mostrar(
+        'El monto cobrado no coincide con el costo del deporte. '
+        'Comprobante: ${resultado.captureId}. Contacta a la administración.',
+        error: true,
+      );
+      return;
+    }
+    _sinRegistrar = resultado;
+    _registrar();
+  }
+
+  Future<void> _registrar() async {
+    final resultado = _sinRegistrar;
+    if (resultado == null) return;
+    setState(() {
+      _mostrarPaypal = false;
+      _guardando = true;
       _mensaje = null;
     });
     try {
-      final texto = await accion();
+      await widget.confirmar(widget.inscripcion, resultado, widget.monto);
       if (!mounted) return;
       setState(() {
-        _mensaje = texto;
+        _aprobado = true;
+        _sinRegistrar = null;
+        _mensaje = '¡Pago aprobado! Tu inscripción quedó confirmada.';
         _error = false;
       });
-    } on PagoException catch (e) {
+    } on InscripcionException catch (e) {
       if (!mounted) return;
       setState(() {
-        _mensaje = e.mensaje;
+        _mensaje = 'PayPal cobró el pago, pero no se pudo confirmar la '
+            'inscripción: ${e.mensaje}\nComprobante: ${resultado.captureId}';
+        _error = true;
+      });
+    } catch (e) {
+      // El detalle va a la consola (F12) para poder diagnosticarlo.
+      debugPrint('No se pudo registrar el pago: $e');
+      if (!mounted) return;
+      setState(() {
+        _mensaje = 'PayPal cobró el pago, pero no se pudo guardar. Revisa tu '
+            'conexión y toca «Reintentar».\nComprobante: ${resultado.captureId}';
         _error = true;
       });
     } finally {
-      if (mounted) setState(() => _cargando = false);
+      if (mounted) setState(() => _guardando = false);
     }
   }
 
-  Future<void> _pagar() => _ejecutar(() async {
-        final orden = await _gateway.crearOrden(widget.inscripcion.id);
-        _pagoId = orden.pagoId;
-        final Future<bool> Function(Uri) abrir = widget.abrirUrl ??
-            (u) => launchUrl(u, mode: LaunchMode.externalApplication);
-        if (!await abrir(Uri.parse(orden.urlAprobacion))) {
-          throw const PagoException('No se pudo abrir PayPal.');
-        }
-        return 'Completa el pago en PayPal y vuelve aquí para tocar «Ya pagué».';
-      });
-
-  Future<void> _yaPague() => _ejecutar(() async {
-        await _gateway.capturar(_pagoId!);
-        _confirmado = true;
-        return '¡Pago aprobado! Tu inscripción quedó confirmada.';
+  void _pagarDeNuevo() => setState(() {
+        _intento++;
+        _mostrarPaypal = true;
+        _mensaje = null;
+        _error = false;
       });
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pagar inscripción')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    final ConstructorVistaPaypal construir = widget.construirVista ??
+        ((url, onTerminar) => VistaPaypal(url: url, onTerminar: onTerminar));
+
+    final encabezado = Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.inscripcion.deporteNombre,
+              style: tema.textTheme.headlineSmall),
+          Text('Monto: ${widget.monto.toStringAsFixed(2)} USD'),
+        ],
+      ),
+    );
+
+    if (_mostrarPaypal) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pagar inscripción')),
+        body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_cargando) const LinearProgressIndicator(),
-            const SizedBox(height: 8),
-            Text(widget.inscripcion.deporteNombre, style: tema.textTheme.headlineSmall),
-            if (widget.monto != null)
-              Text('Monto: ${widget.monto!.toStringAsFixed(2)} USD'),
-            const SizedBox(height: 16),
-            if (_mensaje != null)
-              Text(_mensaje!,
-                  style: TextStyle(color: _error ? tema.colorScheme.error : null)),
-            const Spacer(),
-            if (_confirmado)
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Listo'),
-              )
-            else ...[
-              FilledButton(
-                onPressed: _cargando ? null : _pagar,
-                child: Text(_pagoId == null ? 'Pagar con PayPal' : 'Pagar de nuevo'),
+            encabezado,
+            Expanded(
+              child: KeyedSubtree(
+                key: ValueKey(_intento),
+                child: construir(_url, _alTerminar),
               ),
-              if (_pagoId != null)
-                FilledButton.tonal(
-                  onPressed: _cargando ? null : _yaPague,
-                  child: const Text('Ya pagué'),
-                ),
-              TextButton(
-                onPressed: _cargando ? null : () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
-              ),
-            ],
+            ),
           ],
         ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Pagar inscripción')),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_guardando) const LinearProgressIndicator(),
+          encabezado,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              _guardando ? 'Registrando tu pago…' : (_mensaje ?? ''),
+              style: TextStyle(color: _error ? tema.colorScheme.error : null),
+            ),
+          ),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_aprobado)
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Listo'),
+                  )
+                else if (_sinRegistrar != null)
+                  FilledButton(
+                    onPressed: _guardando ? null : _registrar,
+                    child: const Text('Reintentar'),
+                  )
+                else ...[
+                  FilledButton(
+                    onPressed: _pagarDeNuevo,
+                    child: const Text('Pagar de nuevo'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Volver'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

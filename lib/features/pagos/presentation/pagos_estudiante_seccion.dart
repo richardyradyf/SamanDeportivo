@@ -1,27 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../../models/inscripcion.dart';
-import '../../../repositories/pago_repository.dart';
-import '../data/firestore_pago_repository.dart';
-import '../data/paypal_gateway.dart';
-import 'mis_pagos_screen.dart';
-import 'pagar_inscripcion_screen.dart';
+import 'package:saman_deportivo/features/estudiante/inscripciones/data/firestore_inscripcion_repository.dart';
+import 'package:saman_deportivo/features/pagos/data/firestore_pago_repository.dart';
+import 'package:saman_deportivo/features/pagos/domain/resultado_paypal.dart';
+import 'package:saman_deportivo/features/pagos/presentation/mis_pagos_screen.dart';
+import 'package:saman_deportivo/features/pagos/presentation/pagar_inscripcion_screen.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
+import 'package:saman_deportivo/repositories/pago_repository.dart';
 
-/// Pestaña "Pagos" del estudiante: inscripciones por pagar y su historial.
+/// Pagos del estudiante: inscripciones por pagar y su historial.
 class PagosEstudianteSeccion extends StatefulWidget {
   const PagosEstudianteSeccion({
     super.key,
     required this.estudianteUid,
     required this.pagos,
     required this.pendientes,
+    required this.confirmar,
     this.costoDe,
-    this.gateway,
+    this.construirVista,
   });
 
-  /// Versión con Firebase real; la usa el AuthGate.
+  /// Versión con Firebase real.
   factory PagosEstudianteSeccion.firebase(String uid) {
     final db = FirebaseFirestore.instance;
+    final inscripciones = FirestoreInscripcionRepository(firestore: db);
     return PagosEstudianteSeccion(
       estudianteUid: uid,
       pagos: FirestorePagoRepository(db),
@@ -38,16 +41,25 @@ class PagosEstudianteSeccion extends StatefulWidget {
         final costo = d.data()?['costo'];
         return costo is num ? costo.toDouble() : null;
       },
+      confirmar: (inscripcion, resultado, monto) => inscripciones.confirmar(
+        inscripcion.id,
+        pago: pagoDesdePaypal(
+          inscripcion: inscripcion,
+          resultado: resultado,
+          monto: monto,
+        ),
+      ),
     );
   }
 
   final String estudianteUid;
   final PagoRepository pagos;
   final Stream<List<Inscripcion>> Function() pendientes;
+  final ConfirmarPago confirmar;
 
-  /// Solo para mostrar el monto; el servidor decide el real.
+  /// Costo del deporte: es lo que se cobra en PayPal.
   final Future<double?> Function(String deporteId)? costoDe;
-  final PagoGateway? gateway;
+  final ConstructorVistaPaypal? construirVista;
 
   @override
   State<PagosEstudianteSeccion> createState() => _PagosEstudianteSeccionState();
@@ -69,13 +81,21 @@ class _PagosEstudianteSeccionState extends State<PagosEstudianteSeccion> {
       monto = null;
     }
     if (!mounted) return;
+    if (monto == null || monto <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo obtener el costo del deporte.')),
+      );
+      return;
+    }
+    final costo = monto;
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => PagarInscripcionScreen(
           inscripcion: inscripcion,
-          monto: monto,
-          gateway: widget.gateway,
+          monto: costo,
+          confirmar: widget.confirmar,
+          construirVista: widget.construirVista,
         ),
       ),
     );
@@ -136,6 +156,7 @@ class _PagosEstudianteSeccionState extends State<PagosEstudianteSeccion> {
     );
   }
 }
+
 /// Versión con Firebase real. Se arma al abrirse, no al construirla,
 /// para que las pruebas del AuthGate no necesiten Firebase.
 class PagosEstudianteFirebase extends StatelessWidget {

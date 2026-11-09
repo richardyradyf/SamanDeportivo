@@ -519,11 +519,9 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         );
       }
 
-      final pagoDoc = await transaction.get(pagoRef);
-
-      if (pagoDoc.exists) {
-        throw const InscripcionException('Este pago ya fue registrado.');
-      }
+      // No se lee pagos/{id} antes de crearlo: la regla de lectura de pagos
+      // falla con un documento inexistente y tumbaría la transacción. Las
+      // reglas ya rechazan un pago repetido (exigen que no exista antes).
 
       transaction.set(pagoRef, pago.toMap());
 
