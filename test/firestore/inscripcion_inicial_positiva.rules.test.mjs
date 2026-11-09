@@ -1,33 +1,84 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import test, { before, after } from 'node:test';
+import test, { before, beforeEach, after } from 'node:test';
 
 import {
   initializeTestEnvironment,
   assertSucceeds,
+  assertFails,
 } from '@firebase/rules-unit-testing';
 
 import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 
-// Esta prueba solo puede ejecutarse con el emulador.
+// Nunca ejecutar estas pruebas contra Firebase de producción.
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  throw new Error(
-    'Esta prueba requiere el emulador de Firestore.'
-  );
+  throw new Error('Esta prueba requiere el emulador de Firestore.');
 }
 
 const projectId = 'demo-saman-inscripciones-permitidas';
 const uid = 'estudiante-prueba';
+const uidAjeno = 'otro-estudiante';
 const codigo = 'TEN-01';
 const inscripcionId = `${uid}_${codigo}`;
 
 let env;
+
+function datosInscripcion(fechaActual) {
+  return {
+    estudianteUid: uid,
+    estudianteCedula: '12345678',
+    estudianteNombre: 'Estudiante de Prueba',
+    estudianteCarnet: '20261111',
+    estudianteCorreo: 'prueba@unimet.edu.ve',
+    deporteId: codigo,
+    deporteNombre: 'Tenis',
+    entrenadorUid: null,
+    estado: 'pendiente',
+    motivo: null,
+    fechaInscripcion: fechaActual,
+    fechaLimitePago: new Date(
+      fechaActual.getTime() + 24 * 60 * 60 * 1000
+    ),
+    pagoId: null,
+    historial: [
+      {
+        estado: 'pendiente',
+        fecha: fechaActual,
+        responsableUid: uid,
+      },
+    ],
+  };
+}
+
+function dbPropietario() {
+  return env.authenticatedContext(uid, {
+    email: 'prueba@unimet.edu.ve',
+  }).firestore();
+}
+
+async function crearInscripcion(db) {
+  const fechaActual = new Date();
+
+  const lote = writeBatch(db);
+
+  lote.set(
+    doc(db, 'inscripciones', inscripcionId),
+    datosInscripcion(fechaActual)
+  );
+
+  lote.update(doc(db, 'deportes', codigo), {
+    cuposOcupados: 1,
+  });
+
+  await assertSucceeds(lote.commit());
+}
 
 before(async () => {
   env = await initializeTestEnvironment({
@@ -36,10 +87,13 @@ before(async () => {
       rules: readFileSync('firestore.rules', 'utf8'),
     },
   });
+});
 
+beforeEach(async () => {
   await env.clearFirestore();
 
-  // Preparar datos iniciales exclusivamente en el emulador.
+  // Preparar datos de prueba sin aplicar las reglas.
+  // Esto solo funciona dentro del emulador.
   await env.withSecurityRulesDisabled(async (contexto) => {
     const db = contexto.firestore();
 
@@ -48,6 +102,15 @@ before(async () => {
       nombre: 'Estudiante de Prueba',
       correo: 'prueba@unimet.edu.ve',
       carnet: '20261111',
+      rol: 'estudiante',
+      estado: 'activo',
+    });
+
+    await setDoc(doc(db, 'usuarios', uidAjeno), {
+      cedula: '87654321',
+      nombre: 'Otro Estudiante',
+      correo: 'otro@unimet.edu.ve',
+      carnet: '20262222',
       rol: 'estudiante',
       estado: 'activo',
     });
@@ -82,95 +145,41 @@ after(async () => {
   }
 });
 
+// ==============================================
+// PRUEBA 1: INSCRIPCION Y CANCELACION
+// ==============================================
+
 test(
   'INS-positiva: estudiante se inscribe y luego cancela liberando el cupo',
   async () => {
-    const db = env.authenticatedContext(uid, {
-      email: 'prueba@unimet.edu.ve',
-    }).firestore();
-
-    const referenciaDeporte = doc(
-      db,
-      'deportes',
-      codigo
-    );
+    const db = dbPropietario();
 
     const referenciaInscripcion = doc(
-      db,
-      'inscripciones',
-      inscripcionId
+      db, 'inscripciones', inscripcionId
     );
 
-    // ==========================================
-    // PARTE 1: INSCRIPCION INICIAL
-    // ==========================================
-
-    const fechaActual = new Date();
-
-    const fechaLimite = new Date(
-      fechaActual.getTime() + 24 * 60 * 60 * 1000
+    const referenciaDeporte = doc(
+      db, 'deportes', codigo
     );
 
-    const loteInscripcion = writeBatch(db);
+    // Crear la inscripción y reservar un cupo.
+    await crearInscripcion(db);
 
-    loteInscripcion.set(referenciaInscripcion, {
-      estudianteUid: uid,
-      estudianteCedula: '12345678',
-      estudianteNombre: 'Estudiante de Prueba',
-      estudianteCarnet: '20261111',
-      estudianteCorreo: 'prueba@unimet.edu.ve',
-      deporteId: codigo,
-      deporteNombre: 'Tenis',
-      entrenadorUid: null,
-      estado: 'pendiente',
-      motivo: null,
-      fechaInscripcion: fechaActual,
-      fechaLimitePago: fechaLimite,
-      pagoId: null,
-      historial: [
-        {
-          estado: 'pendiente',
-          fecha: fechaActual,
-          responsableUid: uid,
-        },
-      ],
-    });
-
-    // Reservar un cupo en la misma operacion atomica.
-    loteInscripcion.update(referenciaDeporte, {
-      cuposOcupados: 1,
-    });
-
-    await assertSucceeds(loteInscripcion.commit());
-
-    // Comprobar que la inscripcion fue exitosa.
-    const inscripcionAntes = await getDoc(
-      referenciaInscripcion
-    );
+    const inscripcionAntes = await getDoc(referenciaInscripcion);
+    const deporteAntes = await getDoc(referenciaDeporte);
 
     assert.equal(inscripcionAntes.exists(), true);
     assert.equal(inscripcionAntes.data().estado, 'pendiente');
     assert.equal(inscripcionAntes.data().estudianteUid, uid);
-
-    const deporteAntes = await getDoc(
-      referenciaDeporte
-    );
-
     assert.equal(deporteAntes.data().cuposOcupados, 1);
     assert.equal(deporteAntes.data().cuposConfirmados, 0);
 
-    // ==========================================
-    // PARTE 2: CANCELACION DE LA INSCRIPCION
-    // ==========================================
-
+    // Cancelar la inscripción y liberar el cupo.
     const fechaCancelacion = new Date();
-
-    const historialAnterior =
-      inscripcionAntes.data().historial;
+    const historialAnterior = inscripcionAntes.data().historial;
 
     const loteCancelacion = writeBatch(db);
 
-    // Cambiar el estado de la inscripcion.
     loteCancelacion.update(referenciaInscripcion, {
       estado: 'cancelada',
       motivo: null,
@@ -184,82 +193,82 @@ test(
       ],
     });
 
-    // Liberar exactamente un cupo.
     loteCancelacion.update(referenciaDeporte, {
       cuposOcupados: 0,
     });
 
-    // Las dos actualizaciones deben estar autorizadas.
     await assertSucceeds(loteCancelacion.commit());
 
-    // ==========================================
-    // PARTE 3: VERIFICACION FINAL
-    // ==========================================
+    // Verificar el resultado final.
+    await env.withSecurityRulesDisabled(async (contexto) => {
+      const dbVerificacion = contexto.firestore();
 
-    await env.withSecurityRulesDisabled(
-      async (contexto) => {
-        const dbVerificacion = contexto.firestore();
+      const inscripcionFinal = await getDoc(
+        doc(dbVerificacion, 'inscripciones', inscripcionId)
+      );
 
-        const inscripcionFinal = await getDoc(
-          doc(
-            dbVerificacion,
-            'inscripciones',
-            inscripcionId
-          )
-        );
+      const deporteFinal = await getDoc(
+        doc(dbVerificacion, 'deportes', codigo)
+      );
 
-        const deporteFinal = await getDoc(
-          doc(
-            dbVerificacion,
-            'deportes',
-            codigo
-          )
-        );
+      const datos = inscripcionFinal.data();
 
-        // La inscripcion debe estar cancelada.
-        assert.equal(inscripcionFinal.exists(), true);
-        assert.equal(
-          inscripcionFinal.data().estado,
-          'cancelada'
-        );
+      assert.equal(datos.estado, 'cancelada');
+      assert.equal(datos.motivo, null);
+      assert.equal(datos.historial.length, 2);
+      assert.equal(datos.historial[0].estado, 'pendiente');
+      assert.equal(datos.historial[1].estado, 'cancelada');
+      assert.equal(datos.historial[1].responsableUid, uid);
 
-        // El historial debe conservar ambas operaciones.
-        const historialFinal =
-          inscripcionFinal.data().historial;
+      assert.equal(deporteFinal.data().cuposOcupados, 0);
+      assert.equal(deporteFinal.data().cuposConfirmados, 0);
+    });
+  }
+);
 
-        assert.equal(historialFinal.length, 2);
+// ==============================================
+// PRUEBA 2: SEGURIDAD DE INSCRIPCION AJENA
+// ==============================================
 
-        assert.equal(
-          historialFinal[0].estado,
-          'pendiente'
-        );
+test(
+  'SEG-ajena: otro estudiante no puede modificar una inscripcion completa',
+  async () => {
+    const db = dbPropietario();
 
-        assert.equal(
-          historialFinal[1].estado,
-          'cancelada'
-        );
+    // Crear primero una inscripción completamente válida.
+    await crearInscripcion(db);
 
-        assert.equal(
-          historialFinal[1].responsableUid,
-          uid
-        );
+    const dbAjeno = env.authenticatedContext(uidAjeno, {
+      email: 'otro@unimet.edu.ve',
+    }).firestore();
 
-        assert.equal(
-          inscripcionFinal.data().motivo,
-          null
-        );
-
-        // Los cupos deben regresar al estado inicial.
-        assert.equal(
-          deporteFinal.data().cuposOcupados,
-          0
-        );
-
-        assert.equal(
-          deporteFinal.data().cuposConfirmados,
-          0
-        );
-      }
+    const referenciaAjena = doc(
+      dbAjeno, 'inscripciones', inscripcionId
     );
+
+    // Intentar cancelar una inscripción que no le pertenece.
+    await assertFails(
+      updateDoc(referenciaAjena, {
+        estado: 'cancelada',
+      })
+    );
+
+    // Verificar que la operación rechazada no cambió los datos.
+    await env.withSecurityRulesDisabled(async (contexto) => {
+      const dbVerificacion = contexto.firestore();
+
+      const inscripcion = await getDoc(
+        doc(dbVerificacion, 'inscripciones', inscripcionId)
+      );
+
+      const deporte = await getDoc(
+        doc(dbVerificacion, 'deportes', codigo)
+      );
+
+      assert.equal(inscripcion.data().estado, 'pendiente');
+      assert.equal(inscripcion.data().historial.length, 1);
+      assert.equal(deporte.data().cuposOcupados, 1);
+      assert.equal(deporte.data().cuposConfirmados, 0);
+    });
   }
 );
