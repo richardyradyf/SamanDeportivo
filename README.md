@@ -1,140 +1,314 @@
 # Samán Deportivo
 
 **Proyecto de Sistemas de Información — Universidad Metropolitana (UNIMET)**  
-**Grupo 3 · Fase de Elaboración (Hito 2)**
+**Grupo 3 · Metodología OpenUP · Hito 3: Construcción**
 
-Samán Deportivo es una aplicación desarrollada en **Flutter** con **Firebase Authentication** y **Cloud Firestore** para centralizar progresivamente la gestión de actividades deportivas de la UNIMET. El proyecto sigue la metodología **OpenUP** y se desarrolla de forma colaborativa mediante Git y GitHub.
+Samán Deportivo es una aplicación multiplataforma desarrollada con **Flutter y Firebase** para centralizar la gestión de actividades deportivas de la Universidad Metropolitana. Permite explorar deportes, gestionar reservas y cupos, administrar entrenadores y horarios, registrar reseñas y asistencia, y consultar indicadores operativos.
 
-> **Estado del proyecto:** línea base del Hito 2 (Elaboración). Los módulos completos de deportes, cupos, horarios, inscripciones, pagos y asistencia forman parte de la fase de Construcción (Hito 3); el despliegue final y la PWA corresponden a Transición (Hito 4). Las pantallas de inicio pueden contener secciones provisionales.
+> **Estado del proyecto (9 de noviembre de 2026):** avance de la fase de **Construcción (Hito 3)** integrado en la rama `develop`, con funcionalidades de catálogo, administración, inscripciones, pagos en **PayPal Sandbox**, nómina, asistencia y analítica. La integración de código no equivale a certificación de funcionamiento completo ni a despliegue de producción. La rama `main` conserva, a la fecha de esta actualización, la entrega del Hito 2.
 
-## Funcionalidades del Hito 2
+## 1. Evolución del proyecto
 
-- Registro de estudiantes con validación de formato del correo institucional, creación de cuenta mediante Firebase Authentication y perfil en `usuarios/{uid}` de Cloud Firestore.
-- Inicio y cierre de sesión con correo electrónico y contraseña.
-- Recuperación de contraseña mediante Firebase Authentication.
-- Control de sesión y redirección a las pantallas iniciales según el rol: **estudiante**, **entrenador** o **administrador**.
-- Consulta y edición de perfil según los campos permitidos; acceso al perfil administrativo desde **Configuración**.
-- Navegación adaptable a dispositivos móviles, tabletas y escritorio, siguiendo el sistema visual diseñado en Figma.
-- Reglas de seguridad de Firestore para proteger perfiles y restringir operaciones según la identidad y el rol.
-- Pruebas unitarias y de widgets en Flutter, y pruebas automatizadas de reglas con Firebase Emulator Suite.
+| Hito | Fase OpenUP | Alcance |
+| --- | --- | --- |
+| Hito 1 | Concepción | Problema, actores, requisitos, casos de uso y diseño inicial. |
+| Hito 2 | Elaboración | Arquitectura base, autenticación, perfiles, navegación, seguridad inicial y pruebas. |
+| Hito 3 | Construcción | Módulos de gestión deportiva, reservas, entrenadores, agenda, reseñas, pagos de prueba, asistencia y panel administrativo. |
+| Hito 4 | Transición | Validación final, documentación de uso, despliegue y preparación de distribución. Algunas capacidades de landing y PWA ya están adelantadas en `develop`. |
 
-**Alcances y limitaciones:** el autorregistro público corresponde únicamente a estudiantes. Las cuentas administrativas y de entrenador se aprovisionan mediante acceso privilegiado durante esta fase. La validación del *formato* del correo institucional no equivale a comprobar la identidad o solvencia académica/financiera ante los sistemas de la UNIMET. No se garantiza todavía la unicidad global de cédulas y carnets; estas restricciones y las funcionalidades deportivas se abordarán en iteraciones posteriores.
+### Base funcional conservada del Hito 2
 
-## Tecnologías
+- Registro de estudiantes mediante Firebase Authentication y perfil en `usuarios/{uid}`.
+- Inicio de sesión, cierre de sesión y recuperación de contraseña.
+- Control de sesión y navegación por roles: **estudiante**, **entrenador** y **administrador**.
+- Consulta y edición del perfil según las restricciones del rol.
+- Interfaz adaptable a escritorio, tabletas y dispositivos móviles, basada en Figma.
+- Modelos, repositorios, controladores y reglas iniciales de seguridad para Firestore.
+- Pruebas unitarias, de widgets y de seguridad con Firebase Emulator Suite.
+
+El autorregistro público corresponde a estudiantes. La validación del formato del correo institucional **no constituye una verificación de identidad o solvencia ante los sistemas oficiales de la UNIMET**.
+
+## 2. Funcionalidades desarrolladas en el Hito 3
+
+### Estudiante
+
+- Exploración del catálogo deportivo, detalles, horarios, entrenadores, costos y disponibilidad de cupos.
+- Búsqueda, filtros y registro de eventos de búsqueda.
+- Inscripción con reserva transaccional de cupo y estado inicial **pendiente**.
+- Consulta de inscripciones; cancelación, vencimiento y reinscripción según las reglas del módulo.
+- Sección **Mis deportes**, con disciplinas confirmadas, próxima sesión e información de asistencia.
+- Reseñas y calificaciones sujetas a las condiciones de inscripción, con visualización de agregados.
+- Interfaz de pagos con **PayPal Sandbox** y consulta de registros de pago.
+
+### Entrenador
+
+- Acceso al perfil de entrenador y consulta de estudiantes con inscripción confirmada en sus deportes.
+- Nómina por disciplina.
+- Registro y corrección de asistencia por sesión, con historial y porcentajes.
+- Escritura de asistencia en lotes para respetar los límites de acceso de las reglas de Firestore.
+
+### Administrador
+
+- Gestión de disciplinas deportivas y sus parámetros.
+- Creación y administración de entrenadores mediante Firebase Authentication y Firestore, sin depender de Cloud Functions para el alta.
+- Asignación y modificación de horarios mediante transacciones y control de concurrencia.
+- Gestión y moderación de reseñas.
+- Consulta de estudiantes y control administrativo de su estado.
+- Dashboard y analítica con indicadores de deportes, estudiantes, entrenadores, ocupación, inscripciones, pagos registrados y búsquedas.
+
+### Integridad y seguridad de datos
+
+- Reglas por identidad, rol, propietario y operación.
+- Índices de unicidad compartidos para cédulas y carnets de estudiantes; cédulas compartidas entre estudiantes y entrenadores.
+- Transacciones relacionadas con reservas, cancelaciones, contadores de cupos y agenda.
+- Reglas de acceso a nóminas y registros de asistencia.
+- Pruebas de operaciones permitidas, operaciones rechazadas y concurrencia.
+
+**Nota de alcance:** algunas pantallas siguen siendo provisionales, como la vista de inscripciones del administrador y «Mis disciplinas» del entrenador. La existencia de una clase o un PR fusionado no sustituye su validación funcional extremo a extremo.
+
+## 3. Tecnologías
 
 | Área | Tecnología |
 | --- | --- |
-| Interfaz y aplicación | Flutter / Dart |
+| Aplicación | Flutter y Dart |
 | Autenticación | Firebase Authentication |
-| Base de datos | Cloud Firestore |
-| Estado y dependencias de interfaz | Provider / ChangeNotifier |
-| Pruebas | `flutter_test`, Node.js test runner y Firebase Emulator Suite |
-| Diseño | Figma; tipografía DM Sans |
+| Base de datos y sincronización | Cloud Firestore |
+| Estado de interfaz | Provider / ChangeNotifier |
+| Pagos de prueba | PayPal JavaScript SDK en Sandbox; WebView en Android |
+| Seguridad | Firestore Security Rules |
+| Pruebas | `flutter_test`, Node.js test runner, `@firebase/rules-unit-testing` y Firebase Emulator Suite |
+| Diseño | Figma y tipografía DM Sans |
 | Control de versiones | Git y GitHub |
 
-## Requisitos para desarrollo
+La solución está orientada al **plan Firebase Spark**. El repositorio conserva archivos y dependencias históricos asociados a Cloud Functions; **no se debe interpretar su presencia como evidencia de funciones desplegadas o requeridas por los flujos migrados a Spark**.
 
-- Flutter SDK y Dart compatibles con `pubspec.yaml` (**Dart SDK `^3.13.5`**).
-- Google Chrome, si se ejecutará Flutter Web.
-- Node.js y npm para ejecutar las pruebas de reglas.
-- Firebase CLI y un entorno Java compatible para Firestore Emulator.
-- Configuración/autorización apropiada para el proyecto Firebase de desarrollo, cuando se ejecute la aplicación sin emuladores.
+## 4. Arquitectura
 
-## Instalación y ejecución
+El proyecto utiliza una organización por funcionalidades con separación de responsabilidades:
+
+1. **Presentación:** pantallas, widgets, formularios, navegación y visualización de indicadores.
+2. **Control de sesión y estado:** `SesionController`, `AuthGate` y Provider.
+3. **Dominio:** modelos, enumeraciones, validaciones y cálculos.
+4. **Datos:** repositorios y gateways para las operaciones con Firestore y Firebase Authentication.
+5. **Seguridad:** reglas de Firestore, índices y operaciones transaccionales.
+
+`AuthGate` observa el estado de autenticación y conduce a la interfaz correspondiente al rol. Los repositorios encapsulan consultas y escrituras. Las reglas de Firestore constituyen la última barrera de autorización para el acceso directo desde el cliente.
+
+```text
+lib/
+├── main.dart
+├── core/
+│   ├── config/              # Selección de entorno y emuladores
+│   ├── router/              # AuthGate y navegación
+│   ├── theme/               # Identidad visual
+│   └── widgets/             # Componentes compartidos
+├── features/
+│   ├── auth/                # Registro, inicio de sesión y recuperación
+│   ├── perfil/              # Gestión de perfil
+│   ├── publico/             # Landing y catálogo sin sesión
+│   ├── estudiante/          # Catálogo, inscripciones y Mis deportes
+│   ├── entrenador/          # Nómina, asistencia e historial
+│   ├── admin/               # Deportes, entrenadores, agenda y dashboard
+│   └── pagos/               # Pago Sandbox e historial
+├── models/                  # Entidades y enumeraciones
+├── repositories/            # Contratos de acceso a datos
+├── services/                # Servicios de autenticación y validación
+└── firebase_options.dart    # Configuración FlutterFire
+
+firestore.rules              # Reglas de seguridad
+firestore.indexes.json       # Índices compuestos
+firebase.json                # Firebase y emuladores
+firebase.security.test.json # Suite de reglas generales (puerto 8080)
+firebase.inscripciones.test.json # Suite de inscripciones (puerto 8085)
+test/                       # Pruebas Flutter y Firestore
+scripts/                    # Semillas, mediciones y verificaciones
+web/                        # Recursos de Flutter Web y PayPal Sandbox
+```
+
+### Colecciones principales de Firestore
+
+| Colección o ruta | Propósito |
+| --- | --- |
+| `usuarios/{uid}` | Perfiles y roles. |
+| `cedulas/{cedula}` y `carnets/{carnet}` | Índices de unicidad. |
+| `deportes/{codigo}` | Información deportiva, horarios y contadores de cupos. |
+| `inscripciones/{id}` | Reservas, estados, fechas, historial y referencia al pago. |
+| `pagos/{orderId}` | Registros de pago para consulta y trazabilidad. |
+| `asistencias/{id}` | Asistencia por deporte, fecha y estudiante. |
+| `deportes/{codigo}/resenas/{uid}` | Reseñas asociadas al deporte. |
+| `busquedas/{id}` | Eventos de búsqueda del catálogo. |
+| `control/agenda` y `control/resenas` | Coordinación transaccional. |
+
+## 5. Requisitos de desarrollo
+
+- Flutter SDK compatible con Dart **`^3.13.5`**, según `pubspec.yaml`.
+- Chrome para ejecutar Flutter Web; Android SDK y emulador/dispositivo para Android.
+- Node.js y npm.
+- Firebase CLI y Java para Firestore Emulator.
+- Acceso autorizado al proyecto Firebase `saman-deportivo` solamente cuando se necesite trabajar fuera de los emuladores.
+
+Verificar instalaciones:
+
+```bash
+flutter doctor
+flutter --version
+node --version
+firebase --version
+```
+
+## 6. Instalación y ejecución
+
+Clonar el repositorio y cambiar a la rama de integración:
 
 ```bash
 git clone https://github.com/richardyradyf/SamanDeportivo.git
 cd SamanDeportivo
+git switch develop
 flutter pub get
-flutter run -d chrome
+npm ci
 ```
 
-> **Atención:** la entrada `lib/main.dart` inicializa Firebase usando `lib/firebase_options.dart`. **Por defecto la aplicación no utiliza emuladores**, sino el proyecto Firebase configurado. No utilices usuarios de prueba ni realices escrituras en un entorno compartido sin coordinación del equipo. Para pruebas totalmente locales de registro/login/perfil es necesario configurar Authentication y Firestore Emulator y una entrada de ejecución temporal que conecte sus SDK a los emuladores.
+### Ejecución local con emuladores (recomendada)
 
-## Pruebas
+**Terminal 1 — iniciar Authentication y Firestore:**
 
-Análisis estático y pruebas Flutter:
+```bash
+npm run emulador
+```
+
+**Terminal 2 — cargar datos de demostración cuando corresponda:**
+
+```bash
+npm run emulador:datos
+```
+
+**Terminal 3 — iniciar la aplicación:**
+
+```bash
+flutter run -d chrome --dart-define=USAR_EMULADOR=true
+```
+
+La conexión al emulador se realiza en `lib/core/config/entorno.dart`. El proyecto utiliza por defecto Firestore en el puerto `8080` y Authentication en `9099`. En Android Emulator se utiliza `10.0.2.2` como acceso a la computadora anfitriona.
+
+> **Advertencia:** ejecutar `flutter run -d chrome` **sin** `--dart-define=USAR_EMULADOR=true` conecta la aplicación al proyecto Firebase configurado. No utilizar usuarios ni pagos de prueba sobre datos compartidos sin autorización. La semilla debe usarse solamente en un entorno de emulador controlado.
+
+### Compilación web
+
+```bash
+flutter build web
+```
+
+Esta instrucción genera `build/web`; **no publica automáticamente** la aplicación en Hosting.
+
+## 7. Pruebas automatizadas
+
+Ejecutar las suites con los puertos libres y sin otros emuladores en ejecución. Conservar la salida y el commit evaluado para la entrega.
+
+### Flutter
 
 ```bash
 flutter analyze
 flutter test
+flutter build web
 ```
 
-Pruebas de seguridad de Firestore (ejecuta este comando con el puerto `8080` libre):
+### Reglas generales
 
 ```bash
-npm ci
 npm run test:rules
 ```
 
-El script `test:rules` utiliza `firebase.security.test.json`, el proyecto de demostración `demo-saman-perfil` y Firestore Emulator. Las pruebas están definidas en `test/firestore/firestore.rules.test.mjs` y cubren acceso al perfil, restricciones por rol y operaciones no autorizadas. Para revisar las dependencias de Node.js:
+### Concurrencia de agenda
 
 ```bash
-npm audit
-npm audit --omit=dev
+firebase emulators:exec \
+  --config firebase.security.test.json \
+  --project demo-saman-concurrencia \
+  --only firestore \
+  'node --test test/firestore/spark_concurrencia.rules.test.mjs'
 ```
 
-`npm audit` puede devolver hallazgos en dependencias de desarrollo; revisar los resultados antes de modificar el árbol de dependencias. **No ejecutar `npm audit fix --force` sin evaluación del equipo.**
+### Nómina y asistencia
 
-## Arquitectura
-
-El frontend Flutter organiza responsabilidades entre pantallas, controladores, modelos y servicios/repositorios. `SesionController` escucha los cambios de Firebase Authentication y del perfil en Firestore. `AuthGate` selecciona la pantalla inicial según el estado de sesión y el rol, y `FirestorePerfilRepository` encapsula la lectura y actualización de los perfiles.
-
-```text
-lib/
-├── main.dart                         # Inicialización de Firebase y Provider
-├── core/
-│   ├── router/auth_gate.dart         # Acceso según sesión y rol
-│   ├── theme/                       # Diseño y estilos compartidos
-│   └── widgets/                     # Navegación y widgets reutilizables
-├── features/
-│   ├── auth/                        # Registro, login, recuperación y sesión
-│   ├── perfil/                      # Dominio, repositorio e interfaz de perfil
-│   ├── estudiante/                  # Inicio del estudiante
-│   ├── entrenador/                  # Inicio del entrenador
-│   └── admin/                       # Inicio y configuración administrativa
-├── models/                          # Persona, Estudiante, Entrenador, Administrador
-├── services/                        # AuthService y UsuarioService
-└── firebase_options.dart            # Configuración Firebase para Flutter
-
-firestore.rules                     # Seguridad de Cloud Firestore
-firebase.security.test.json        # Configuración de las pruebas locales
-node_modules/                      # Dependencias locales; no versionar
+```bash
+firebase emulators:exec \
+  --config firebase.security.test.json \
+  --project demo-saman-perfil \
+  --only firestore \
+  'node --test test/firestore/asistencias.rules.test.mjs'
 ```
 
-### Modelo de usuarios
+### Pagos y confirmación de inscripciones
 
-Los perfiles se almacenan en la colección `usuarios`, con un documento por UID de Authentication. Los campos comunes son `cedula`, `nombre`, `correo` y `rol`. Un estudiante incorpora `carnet` y `estado`; un entrenador, `especialidad` y `aniosExperiencia`. Los datos de autenticación, incluida la contraseña, son administrados por Firebase Authentication y no se almacenan en los documentos de usuario.
+```bash
+firebase emulators:exec \
+  --config firebase.security.test.json \
+  --project demo-saman-inscripciones \
+  --only firestore \
+  'node --test test/firestore/inscripciones.rules.test.mjs'
+```
 
-## Documentación técnica
+### Inscripciones avanzadas y registro único
+
+```bash
+firebase emulators:exec \
+  --config firebase.inscripciones.test.json \
+  --project demo-saman-inscripciones-permitidas \
+  --only firestore \
+  'node --test --test-concurrency=1 test/firestore/inscripcion_inicial_positiva.rules.test.mjs test/firestore/expiracion.rules.test.mjs test/firestore/rechazo.rules.test.mjs test/firestore/reinscripcion.rules.test.mjs test/firestore/registro_unico.rules.test.mjs'
+```
+
+**Interpretación de resultados:** una suite con código de salida `0` no garantiza por sí sola que una denegación haya sido evaluada correctamente. Algunas pruebas negativas pueden pasar aunque el emulador reporte el error de **límite de 1.000 expresiones**. Revisar los logs, las operaciones específicas y, cuando sea necesario, la cobertura de reglas.
+
+Los resultados numéricos consignados en las descripciones de los PR corresponden a las ejecuciones reportadas por sus autores; el cierre debe utilizar los resultados de la batería completa sobre **un mismo commit de `develop`**.
+
+## 8. Limitaciones y verificaciones pendientes
+
+1. **Solvencia UNIMET:** se simula mediante el estado administrativo `activo`/`inactivo` del estudiante; no se consulta un sistema institucional real.
+2. **PayPal Sandbox:** la interfaz captura el resultado mediante PayPal JS SDK, pero la confirmación escrita desde Flutter **no verifica el identificador de captura contra la API de PayPal mediante un servidor de confianza**. Las reglas cotejan estructura, identidad, monto y escrituras vinculadas, pero ello **no prueba que el dinero se haya cobrado**. Este flujo debe utilizarse únicamente con Sandbox y datos de prueba; no es apto para cobros reales.
+3. **Reglas Firestore:** está pendiente acreditar la eliminación de los errores de **1.000 expresiones** observados en determinadas pruebas negativas de inscripción y concurrencia. No desplegar reglas sin revisar las operaciones afectadas.
+4. **Pantallas provisionales:** entre otras, la consulta administrativa de inscripciones y «Mis disciplinas» del entrenador requieren completar su presentación.
+5. **Validación integral:** faltan registros de una ejecución completa de QA en un único commit y verificación manual de los tres roles.
+6. **Rendimiento y despliegue:** existen mediciones con emulador documentadas, pero faltan pruebas de Hosting y de base de datos real. No hay certificación de despliegue final en este README.
+
+## 9. Documentación técnica y evidencias
 
 - [Patrones de diseño](docs/PATRONES_DISENO.md)
-- [Perfil y seguridad de Firebase](docs/PERFIL_FIREBASE.md)
-- [Reglas de seguridad](firestore.rules)
-- [Pruebas de reglas de Firestore](test/firestore/firestore.rules.test.mjs)
-- Informe académico del Hito 2: documento entregado por el equipo fuera de este repositorio, hasta que se incorpore una versión aprobada.
+- [Perfil y Firebase](docs/PERFIL_FIREBASE.md)
+- [Reglas de Firestore](firestore.rules)
+- [Plan de pruebas de inscripciones](docs/plan_pruebas_inscripciones.md)
+- [Rendimiento del catálogo](docs/rendimiento_catalogo.md)
+- [Cierre técnico de módulos Spark](docs/SPARK_ALEXANDER_CIERRE.md)
+- [Pruebas generales de reglas](test/firestore/firestore.rules.test.mjs)
+- [Pruebas de asistencia](test/firestore/asistencias.rules.test.mjs)
+- [Pruebas de registro único](test/firestore/registro_unico.rules.test.mjs)
 
-## Colaboración y ramas
+El informe académico del **Hito 2** fue entregado por separado. La documentación del **Hito 3** debe utilizar evidencia de las pruebas ejecutadas y del código efectivamente integrado.
 
-- **`main`**: línea base estable/entregas aprobadas del proyecto.
-- **`develop`**: rama de integración del equipo.
-- **`feature/*`**, **`fix/*`**, **`docs/*`**: ramas de trabajo para funciones, correcciones y documentación.
+## 10. Flujo de trabajo y control de versiones
 
-Flujo recomendado: crear una rama desde `develop` → implementar y probar → abrir Pull Request dirigido a `develop` → revisión e integración → validar `develop` → abrir Pull Request de `develop` a `main` al cerrar el hito. Evitar commits directos o *force push* a `main`.
+- **`main`:** entregas aprobadas y línea base estable.
+- **`develop`:** integración continua del equipo.
+- **`feature/*`:** nuevas funcionalidades.
+- **`fix/*`:** correcciones.
+- **`docs/*`:** documentación.
 
-## Equipo
+Flujo: rama de trabajo desde `develop` → implementación y pruebas → Pull Request hacia `develop` → revisión → integración → QA integral → Pull Request de `develop` hacia `main`.
 
-- **Richard Yrady:** coordinación e integración del proyecto, modelo de dominio, sesión y diseño compartido.
-- **Mariana Di Buongrazio:** registro de estudiantes e integración con Firebase.
-- **Gabriel Cedeño:** navegación responsiva, AuthGate y patrones de diseño.
-- **Andrés Arrieta:** inicio de sesión y recuperación de contraseña.
-- **Alexander Ramírez:** módulo de perfil, interfaz, seguridad de Firestore y pruebas asociadas.
+Evitar cambios directos o `force push` sobre `main`. Registrar el commit exacto sobre el que se ejecutó el QA y preservar evidencia de los escenarios aprobados y bloqueados.
 
-## Estado de entregas
+### Trabajo integrado durante Construcción
 
-- **Hito 1 — Concepción:** definición del problema, requisitos, modelado inicial y prototipado.
-- **Hito 2 — Elaboración:** arquitectura base, autenticación, perfiles, seguridad e integración.
-- **Hito 3 — Construcción:** módulos de operación deportiva y funcionalidades de negocio **pendientes**.
-- **Hito 4 — Transición:** validación final, PWA y despliegue en Firebase Hosting **pendientes**.
+Los PR **#18 a #34** abarcan modelos y estructura base, catálogo, administración de deportes, entrenadores, agenda, dashboard, reseñas, inscripciones, registro único, nómina, asistencia, landing y pagos Sandbox. Consultar el historial de GitHub para identificar autores, revisión y fecha de cada integración.
 
-*Este README describe la funcionalidad existente y el alcance del Hito 2; no certifica por sí solo el despliegue de reglas ni la aprobación académica de la entrega.*
+## 11. Equipo de desarrollo
+
+- **Richard Yrady:** coordinación general, arquitectura e integración de ramas.
+- **Mariana Di Buongrazio:** registro único, inscripciones, cupos y reglas correspondientes.
+- **Gabriel Cedeño:** catálogo, búsquedas, experiencia del estudiante, landing e integración de asistencia.
+- **Andrés Arrieta:** autenticación, recuperación de contraseña, pagos y componentes de nómina/asistencia.
+- **Alexander Ramírez:** perfiles, gestión de deportes y entrenadores, agenda, reseñas, dashboard, reglas y pruebas Spark.
+
+---
+
+**Alcance documental:** este README describe el código disponible en `develop` y sus limitaciones conocidas al 9 de noviembre de 2026. No equivale a una aprobación de despliegue, una certificación de seguridad para pagos reales ni una declaración de que todos los requisitos del Hito 3 estén cerrados.
