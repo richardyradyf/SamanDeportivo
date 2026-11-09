@@ -22,69 +22,221 @@ service cloud.firestore {
     // NO usar esta condición como prueba de solvencia UNIMET.
     // El estado fue definido en el Hito 1, pero la validación institucional
     // se integrará en Hito 3 mediante lógica privilegiada del servidor.
-    function nuevoEstudianteValido(uid) {
-      return esPropietario(uid)
-        && request.resource.data.keys().hasAll([
-          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
-        ])
-        && request.resource.data.keys().hasOnly([
-          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
-        ])
-        && request.resource.data.rol == 'estudiante'
-        && request.resource.data.estado == 'activo'
-        && request.resource.data.nombre is string
-        && request.resource.data.nombre.size() >= 2
-        && request.resource.data.nombre.size() <= 100
-        && request.resource.data.correo is string
-        && request.resource.data.correo == request.auth.token.email
-        && request.resource.data.cedula is string
-        && request.resource.data.cedula.size() >= 5
-        && request.resource.data.cedula.size() <= 20
-        && request.resource.data.carnet is string
-        && request.resource.data.carnet.matches('^[a-zA-Z0-9-]{4,24}$');
+    // Los indices del estudiante deben existir en el mismo commit.
+    function indicesEstudianteValidos(uid, cedula, carnet) {
+      return getAfter(
+          /databases/$(database)/documents/cedulas/$(cedula)
+        ).data.uid == uid
+        && getAfter(
+          /databases/$(database)/documents/carnets/$(carnet)
+        ).data.uid == uid;
     }
 
+    function nuevoEstudianteValido(uid) {
+      let d = request.resource.data;
 
-    // Spark: solo el administrador crea entrenadores. La otra escritura
-    // (cedulas/{cedula}) debe existir en el mismo commit atómico.
+      return esPropietario(uid)
+        && d.keys().hasAll([
+          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
+        ])
+        && d.keys().hasOnly([
+          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
+        ])
+        && d.rol == 'estudiante'
+        && d.estado == 'activo'
+        && d.nombre is string
+        && d.nombre.size() >= 2
+        && d.nombre.size() <= 100
+        && d.correo is string
+        && d.correo == request.auth.token.email
+        && d.cedula is string
+        && d.cedula.matches('^[0-9]{5,20}$')
+        && d.carnet is string
+        && d.carnet.matches('^[a-zA-Z0-9-]{4,24}$')
+        && indicesEstudianteValidos(uid, d.cedula, d.carnet);
+    }
+
+    // Mantener la creacion de entrenadores de Alexander.
     function nuevoEntrenadorAdminValido(uid) {
       let d = request.resource.data;
+
       return esAdministrador()
-        && d.keys().hasAll(['nombre','correo','cedula','rol','especialidad','aniosExperiencia'])
-        && d.keys().hasOnly(['nombre','correo','cedula','rol','especialidad','aniosExperiencia'])
+        && d.keys().hasAll([
+          'nombre', 'correo', 'cedula', 'rol',
+          'especialidad', 'aniosExperiencia'
+        ])
+        && d.keys().hasOnly([
+          'nombre', 'correo', 'cedula', 'rol',
+          'especialidad', 'aniosExperiencia'
+        ])
         && d.rol == 'entrenador'
-        && d.nombre is string && d.nombre.size() >= 3 && d.nombre.size() <= 100
-        && d.correo is string && d.correo.size() <= 150
-        && d.cedula is string && d.cedula.matches('^[0-9]{5,20}$')
-        && d.especialidad is string && d.especialidad.size() >= 2 && d.especialidad.size() <= 100
-        && d.aniosExperiencia is int && d.aniosExperiencia >= 0 && d.aniosExperiencia <= 60
-        && getAfter(/databases/$(database)/documents/cedulas/$(d.cedula)).data.uid == uid;
+        && d.nombre is string
+        && d.nombre.size() >= 3
+        && d.nombre.size() <= 100
+        && d.correo is string
+        && d.correo.size() <= 150
+        && d.cedula is string
+        && d.cedula.matches('^[0-9]{5,20}$')
+        && d.especialidad is string
+        && d.especialidad.size() >= 2
+        && d.especialidad.size() <= 100
+        && d.aniosExperiencia is int
+        && d.aniosExperiencia >= 0
+        && d.aniosExperiencia <= 60
+        && getAfter(
+          /databases/$(database)/documents/cedulas/$(d.cedula)
+        ).data.uid == uid;
     }
 
     function edicionPropiaValida() {
-      let cambiados = request.resource.data.diff(resource.data).affectedKeys();
-      return resource.data.rol in ['estudiante', 'entrenador', 'administrador']
-        && cambiados.hasOnly(resource.data.rol == 'estudiante'
-          ? ['nombre', 'carnet'] : ['nombre'])
+      let cambiados =
+        request.resource.data.diff(resource.data).affectedKeys();
+
+      return resource.data.rol in [
+          'estudiante', 'entrenador', 'administrador'
+        ]
+        && cambiados.hasOnly(
+          resource.data.rol == 'estudiante'
+            ? ['nombre', 'carnet']
+            : ['nombre']
+        )
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 2
         && request.resource.data.nombre.size() <= 100
-        && (resource.data.rol != 'estudiante'
-          || (request.resource.data.carnet is string
-            && request.resource.data.carnet.matches('^[a-zA-Z0-9-]{4,24}$')));
+        && (
+          resource.data.rol != 'estudiante'
+          || (
+            request.resource.data.carnet is string
+            && request.resource.data.carnet.matches(
+              '^[a-zA-Z0-9-]{4,24}$'
+            )
+            && (
+              request.resource.data.carnet == resource.data.carnet
+              || cambioCarnetValido()
+            )
+          )
+        );
     }
 
-    // Índice de cédulas: alta única, solo administrador, con perfil asociado.
+    // El cambio de carnet exige crear el nuevo indice
+    // y eliminar el antiguo en la misma operacion.
+    function cambioCarnetValido() {
+      let uid = request.auth.uid;
+      let anterior = resource.data.carnet;
+      let nuevo = request.resource.data.carnet;
+
+      return anterior is string
+        && anterior != nuevo
+        && exists(
+          /databases/$(database)/documents/carnets/$(anterior)
+        )
+        && get(
+          /databases/$(database)/documents/carnets/$(anterior)
+        ).data.uid == uid
+        && !exists(
+          /databases/$(database)/documents/carnets/$(nuevo)
+        )
+        && !existsAfter(
+          /databases/$(database)/documents/carnets/$(anterior)
+        )
+        && getAfter(
+          /databases/$(database)/documents/carnets/$(nuevo)
+        ).data.uid == uid;
+    }
+
+    // Indice compartido por estudiantes y entrenadores.
     match /cedulas/{cedula} {
       allow get: if esAdministrador();
       allow list: if false;
-      allow create: if esAdministrador()
-        && request.resource.data.keys().hasOnly(['uid'])
+
+      allow create: if request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.keys().hasAll(['uid'])
         && request.resource.data.uid is string
-        && getAfter(/databases/$(database)/documents/usuarios/$(request.resource.data.uid)).data.cedula == cedula
-        && getAfter(/databases/$(database)/documents/usuarios/$(request.resource.data.uid)).data.rol == 'entrenador';
+        && (
+          // Alta de entrenador gestionada por administrador.
+          (
+            esAdministrador()
+            && getAfter(
+              /databases/$(database)/documents/usuarios/$(request.resource.data.uid)
+            ).data.cedula == cedula
+            && getAfter(
+              /databases/$(database)/documents/usuarios/$(request.resource.data.uid)
+            ).data.rol == 'entrenador'
+          )
+          ||
+          // Alta de estudiante propietario.
+          (
+            esPropietario(request.resource.data.uid)
+            && !exists(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            )
+            && getAfter(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            ).data.cedula == cedula
+            && getAfter(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            ).data.rol == 'estudiante'
+          )
+        );
+
       allow update, delete: if false;
+    }
+
+    // Indice unico de carnets de estudiantes.
+    match /carnets/{carnet} {
+      allow get: if esAdministrador();
+      allow list: if false;
+
+      allow create: if autenticado()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.keys().hasAll(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && carnet.matches('^[a-zA-Z0-9-]{4,24}$')
+        && getAfter(
+          /databases/$(database)/documents/usuarios/$(request.auth.uid)
+        ).data.rol == 'estudiante'
+        && getAfter(
+          /databases/$(database)/documents/usuarios/$(request.auth.uid)
+        ).data.carnet == carnet
+        && (
+          // Registro inicial.
+          !exists(
+            /databases/$(database)/documents/usuarios/$(request.auth.uid)
+          )
+          ||
+          // Cambio de carnet: el antiguo desaparece.
+          (
+            get(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            ).data.carnet != carnet
+            && !existsAfter(
+              /databases/$(database)/documents/carnets/$(get(
+                /databases/$(database)/documents/usuarios/$(request.auth.uid)
+              ).data.carnet)
+            )
+          )
+        );
+
+      // No se permite modificar el propietario de un carnet.
+      allow update: if false;
+
+      // Eliminar el indice solo al cambiar el carnet del perfil.
+      allow delete: if autenticado()
+        && resource.data.uid == request.auth.uid
+        && exists(
+          /databases/$(database)/documents/usuarios/$(request.auth.uid)
+        )
+        && get(
+          /databases/$(database)/documents/usuarios/$(request.auth.uid)
+        ).data.carnet == carnet
+        && getAfter(
+          /databases/$(database)/documents/usuarios/$(request.auth.uid)
+        ).data.carnet != carnet
+        && getAfter(
+          /databases/$(database)/documents/carnets/$(getAfter(
+            /databases/$(database)/documents/usuarios/$(request.auth.uid)
+          ).data.carnet)
+        ).data.uid == request.auth.uid;
     }
 
     match /usuarios/{uid} {
