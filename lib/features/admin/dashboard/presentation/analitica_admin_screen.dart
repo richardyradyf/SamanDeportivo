@@ -1,3 +1,4 @@
+import 'package:saman_deportivo/features/admin/dashboard/presentation/panel_asistencia_admin.dart';
 import 'package:saman_deportivo/features/admin/dashboard/presentation/panel_indicadores_operativos.dart';
 import 'package:flutter/material.dart';
 import 'package:saman_deportivo/features/admin/dashboard/data/dashboard_repository.dart';
@@ -40,6 +41,8 @@ class AnaliticaAdminScreen extends StatelessWidget {
                 construir: (context, resumen) =>
                     _ContenidoAnalitica(resumen: resumen),
               ),
+              const SizedBox(height: 16),
+              const PanelAsistenciaAdmin(),
             ],
           ),
         ),
