@@ -1,4 +1,3 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -28,14 +27,11 @@ class RegistroController extends ChangeNotifier {
     final carnetLimpio = carnet.trim();
     final correoLimpio = correo.trim().toLowerCase();
 
-    // Nombre y apellido.
     final palabras = nombreLimpio.split(RegExp(r'\s+'));
 
     if (palabras.length < 2 ||
         palabras.any((palabra) => palabra.length < 2) ||
-        !RegExp(
-          r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$',
-        ).hasMatch(nombreLimpio)) {
+        !RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$').hasMatch(nombreLimpio)) {
       return 'Debes ingresar nombre y apellido válidos';
     }
 
@@ -43,29 +39,23 @@ class RegistroController extends ChangeNotifier {
       return 'El nombre no puede superar los 100 caracteres';
     }
 
-    // Cédula: entre 5 y 20 dígitos.
     if (!RegExp(r'^[0-9]+$').hasMatch(cedulaLimpia)) {
       return 'La cédula debe contener solo números';
     }
 
-    if (cedulaLimpia.length < 5 ||
-        cedulaLimpia.length > 20) {
+    if (cedulaLimpia.length < 5 || cedulaLimpia.length > 20) {
       return 'La cédula debe tener entre 5 y 20 dígitos';
     }
 
-    // Carnet: letras, números y guiones.
     if (carnetLimpio.isEmpty) {
       return 'Debes ingresar tu número de carnet';
     }
 
-    if (!RegExp(
-      r'^[a-zA-Z0-9-]{4,24}$',
-    ).hasMatch(carnetLimpio)) {
+    if (!RegExp(r'^[a-zA-Z0-9-]{4,24}$').hasMatch(carnetLimpio)) {
       return 'El carnet debe tener entre 4 y 24 caracteres '
           'y solo puede contener letras, números o guiones';
     }
 
-    // Correo institucional UNIMET.
     final correoValido = RegExp(
       r'^[A-Za-z0-9._%+-]+@(correo\.unimet\.edu\.ve|unimet\.edu\.ve)$',
       caseSensitive: false,
@@ -75,7 +65,6 @@ class RegistroController extends ChangeNotifier {
       return 'Debes utilizar un correo institucional UNIMET';
     }
 
-    // Contraseña.
     if (contrasena.length < 6) {
       return 'La contraseña debe tener al menos 6 caracteres';
     }
@@ -83,7 +72,6 @@ class RegistroController extends ChangeNotifier {
     return null;
   }
 
-  // Estados utilizados por la pantalla.
   void cambiarCargando(bool valor) {
     _cargando = valor;
     notifyListeners();
@@ -108,7 +96,6 @@ class RegistroController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Registrar al estudiante en Firebase.
   Future<void> registrarEstudiante({
     required String nombre,
     required String cedula,
@@ -143,7 +130,7 @@ class RegistroController extends ChangeNotifier {
     bool perfilGuardado = false;
 
     try {
-      // 1. Crear la cuenta en Firebase Authentication.
+      // 1. Crear cuenta en Firebase Authentication.
       final credencial = await authService.registrarUsuario(
         correo: correoNormalizado,
         contrasena: contrasena,
@@ -152,10 +139,10 @@ class RegistroController extends ChangeNotifier {
       cuentaCreada = credencial.user;
 
       if (cuentaCreada == null) {
-        throw Exception('Firebase no devolvió un usuario válido');
+        throw StateError('Firebase no devolvió un usuario válido');
       }
 
-      // 2. Crear el perfil del estudiante activo.
+      // 2. Preparar perfil del estudiante.
       final estudiante = Estudiante(
         uid: cuentaCreada.uid,
         cedula: cedula.trim(),
@@ -164,38 +151,58 @@ class RegistroController extends ChangeNotifier {
         carnet: carnet.trim(),
       );
 
-      // 3. Guardar el perfil en Cloud Firestore.
+      // 3. Guardar perfil e índices en Firestore.
       await usuarioService.guardarEstudiante(estudiante);
       perfilGuardado = true;
 
-      // 4. Confirmar el registro.
+      // 4. Confirmar registro exitoso.
       confirmarRegistro();
     } on FirebaseAuthException catch (e) {
       mostrarError(_mensajeErrorFirebase(e.code));
+      _registrarErrorTecnico(e);
+    } on FirebaseException catch (e) {
+      mostrarError(_mensajeErrorFirestore(e.code));
+      _registrarErrorTecnico(e);
+    } on ArgumentError catch (e) {
+      mostrarError(
+        'Los datos ingresados no son válidos. '
+        'Revisa la cédula y el carnet.',
+      );
+      _registrarErrorTecnico(e);
+    } on StateError catch (e) {
+      // Estos mensajes vienen de validaciones
+      // explícitas de nuestro servicio.
+      final mensaje = e.message;
+
+      if (mensaje.contains('ya esta registrada') ||
+          mensaje.contains('ya tiene un perfil')) {
+        mostrarError(mensaje);
+      } else {
+        mostrarError(
+          'No se pudo completar el registro. '
+          'Contacta al administrador si el problema continúa.',
+        );
+      }
+
+      _registrarErrorTecnico(e);
     } catch (e) {
       mostrarError(
-        'No se pudo completar el registro. '
-        'Verifica tu conexión e inténtalo nuevamente.',
+        'Ocurrió un problema inesperado durante el registro. '
+        'Inténtalo nuevamente.',
       );
-
-      if (kDebugMode) {
-        debugPrint('Error durante el registro: $e');
-      }
+      _registrarErrorTecnico(e);
     } finally {
-      // Si la cuenta se creó pero falló el perfil,
-      // intentar eliminar la cuenta incompleta.
+      // Si Authentication creó la cuenta, pero
+      // Firestore rechazó el perfil, intentar eliminarla.
       if (cuentaCreada != null && !perfilGuardado) {
         try {
           await cuentaCreada.delete();
         } catch (e) {
           mostrarError(
-            'No se pudo guardar el perfil ni eliminar '
-            'la cuenta incompleta. Contacta al administrador.',
+            'No se pudo completar el registro y quedó una '
+            'cuenta incompleta. Contacta al administrador.',
           );
-
-          if (kDebugMode) {
-            debugPrint('Error al eliminar cuenta incompleta: $e');
-          }
+          _registrarErrorTecnico(e);
         }
       }
 
@@ -205,7 +212,6 @@ class RegistroController extends ChangeNotifier {
     }
   }
 
-  // Mensajes de errores de Firebase Authentication.
   String _mensajeErrorFirebase(String codigo) {
     switch (codigo) {
       case 'email-already-in-use':
@@ -221,10 +227,47 @@ class RegistroController extends ChangeNotifier {
         return 'Error de conexión. Revisa tu internet';
 
       case 'operation-not-allowed':
-        return 'El registro con correo y contraseña no está habilitado';
+        return 'El registro con correo y contraseña '
+            'no está habilitado';
 
       default:
-        return 'Ocurrió un error al registrar tu cuenta';
+        return 'No se pudo crear tu cuenta. '
+            'Inténtalo nuevamente.';
+    }
+  }
+
+  String _mensajeErrorFirestore(String codigo) {
+    switch (codigo) {
+      case 'permission-denied':
+        return 'No se pudo validar el registro. '
+            'Comprueba que la cédula y el carnet sean '
+            'correctos y no estén registrados por '
+            'otra persona. Si el problema continúa, '
+            'contacta al administrador.';
+
+      case 'already-exists':
+        return 'Ya existe un registro con alguno '
+            'de los datos proporcionados.';
+
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'No se pudo conectar con la base de datos. '
+            'Revisa tu conexión e inténtalo nuevamente.';
+
+      case 'failed-precondition':
+      case 'aborted':
+        return 'No se pudo completar el registro. '
+            'Inténtalo nuevamente.';
+
+      default:
+        return 'No se pudo guardar el perfil. '
+            'Inténtalo nuevamente o contacta al administrador.';
+    }
+  }
+
+  void _registrarErrorTecnico(Object error) {
+    if (kDebugMode) {
+      debugPrint('Error durante el registro: $error');
     }
   }
 }
