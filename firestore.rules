@@ -531,6 +531,76 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // RF-13 y RF-14 (Hito 3): nómina y asistencia del entrenador.
+    // Van en bloques aparte de los de inscripciones porque Firestore suma
+    // los permisos de todos los match de una misma ruta. Así estas reglas
+    // no cambian las de inscripciones, cupos y pagos.
+
+    function rutaInscripcion(inscripcionId) {
+      return /databases/$(database)/documents/inscripciones/$(inscripcionId);
+    }
+
+    // Nómina: el entrenador solo ve inscripciones confirmadas (pagadas) en
+    // las que figura como entrenador. La consulta tiene que filtrar por
+    // entrenadorUid y por estado == 'confirmada'.
+    function entrenadorVeInscripcion() {
+      return autenticado()
+        && resource.data.entrenadorUid == request.auth.uid
+        && resource.data.estado == 'confirmada';
+    }
+
+    // Un registro de asistencia lo escribe el entrenador actual del deporte,
+    // y solo para un estudiante con la inscripción confirmada en ese deporte.
+    // El ID es {codigo}_{AAAA-MM-DD}_{estudianteUid}: un registro por día.
+    // Cada registro hace 2 lecturas (deporte e inscripción); por eso la app
+    // guarda la lista en lotes de 8 y no pasa el límite de 20 por lote.
+    function asistenciaValida(asistenciaId) {
+      let d = request.resource.data;
+      return autenticado()
+        && d.keys().hasAll([
+          'inscripcionId', 'estudianteUid', 'estudianteNombre', 'deporteId',
+          'entrenadorUid', 'fecha', 'estado'
+        ])
+        && d.keys().hasOnly([
+          'inscripcionId', 'estudianteUid', 'estudianteNombre', 'deporteId',
+          'entrenadorUid', 'fecha', 'estado'
+        ])
+        && d.deporteId is string && d.deporteId.matches('^[A-Z]{3}-[0-9]{2}$')
+        && d.estudianteUid is string && d.estudianteUid.matches('^[A-Za-z0-9-]{1,128}$')
+        && d.estudianteNombre is string && d.estudianteNombre.size() <= 100
+        && d.estado in ['presente', 'ausente']
+        && d.fecha is timestamp
+        && d.fecha <= request.time + duration.value(1, 'd')
+        && d.entrenadorUid == request.auth.uid
+        && asistenciaId.matches(
+          '^' + d.deporteId + '_[0-9]{4}-[0-9]{2}-[0-9]{2}_' + d.estudianteUid + '$'
+        )
+        && d.inscripcionId == d.estudianteUid + '_' + d.deporteId
+        && get(rutaDeporte(d.deporteId)).data.entrenadorUid == request.auth.uid
+        && get(rutaInscripcion(d.inscripcionId)).data.estado == 'confirmada'
+        && get(rutaInscripcion(d.inscripcionId)).data.estudianteUid == d.estudianteUid
+        && get(rutaInscripcion(d.inscripcionId)).data.deporteId == d.deporteId;
+    }
+
+    match /inscripciones/{inscripcionId} {
+      allow get, list: if entrenadorVeInscripcion();
+    }
+
+    match /asistencias/{asistenciaId} {
+      // El estudiante ve la suya, el entrenador la que registró y el
+      // administrador todas. Las consultas tienen que filtrar por
+      // estudianteUid o por entrenadorUid.
+      allow get, list: if esAdministrador()
+        || (autenticado()
+          && (resource.data.estudianteUid == request.auth.uid
+            || resource.data.entrenadorUid == request.auth.uid));
+      allow create: if asistenciaValida(asistenciaId);
+      // El entrenador puede corregir presente o ausente, pero no el día.
+      allow update: if asistenciaValida(asistenciaId)
+        && request.resource.data.fecha == resource.data.fecha;
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

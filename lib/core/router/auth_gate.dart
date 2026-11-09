@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:saman_deportivo/features/admin/screens/inicio_admin_screen.dart';
 import 'package:saman_deportivo/features/auth/controllers/sesion_controller.dart';
+import 'package:saman_deportivo/features/entrenador/entrenador_firebase.dart';
 import 'package:saman_deportivo/features/entrenador/screens/inicio_entrenador_screen.dart';
 import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_screen.dart';
 import 'package:saman_deportivo/features/perfil/presentation/perfil_screen.dart';
@@ -117,6 +118,9 @@ class AuthGate extends StatelessWidget {
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+        estudiantes: NominaFirebase(uid: persona.uid),
+        asistencia: TomarAsistenciaFirebase(uid: persona.uid),
+        historial: HistorialAsistenciaFirebase(uid: persona.uid),
       ),
 
       Rol.administrador => InicioAdminScreen(
