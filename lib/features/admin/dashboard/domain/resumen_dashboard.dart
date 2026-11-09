@@ -126,7 +126,12 @@ class ResumenDashboard {
       deportesSinEntrenador: sinEntrenador,
       estudiantes: usuarios.where((u) => u.rol == 'estudiante').length,
       estudiantesActivos: usuarios
-          .where((u) => u.rol == 'estudiante' && u.estado == 'activo')
+          .where(
+            (u) =>
+                u.rol == 'estudiante' &&
+                EstadoEstudiante.desdeTexto(u.estado) ==
+                    EstadoEstudiante.activo,
+          )
           .length,
       entrenadores: usuarios.where((u) => u.rol == 'entrenador').length,
       cuposTotales: capacidadTotal,

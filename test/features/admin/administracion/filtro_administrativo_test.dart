@@ -14,4 +14,7 @@ void main() {
   test('mantiene números de cédula y carnet', () {
     expect(normalizarTextoAdministrativo('  V-12345678 '), 'v-12345678');
   });
+  test('comparte caracteres ampliados del catálogo', () {
+    expect(normalizarTextoAdministrativo('Peña Çaña'), 'pena cana');
+  });
 }

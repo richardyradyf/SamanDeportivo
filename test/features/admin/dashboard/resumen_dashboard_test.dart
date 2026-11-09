@@ -102,4 +102,17 @@ void main() {
     expect(usuario.rol, 'estudiante');
     expect(usuario.estado, 'activo');
   });
+  test('estado ausente sigue convención del modelo Estudiante', () {
+    final resumen = ResumenDashboard.calcular(
+      deportes: const [],
+      usuarios: const [
+        UsuarioDashboard(rol: 'estudiante'),
+        UsuarioDashboard(rol: 'estudiante', estado: 'activo'),
+        UsuarioDashboard(rol: 'estudiante', estado: 'inactivo'),
+        UsuarioDashboard(rol: 'entrenador'),
+      ],
+    );
+    expect(resumen.estudiantes, 3);
+    expect(resumen.estudiantesActivos, 2);
+  });
 }

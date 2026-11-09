@@ -26,9 +26,9 @@ class PanelIndicadoresOperativos extends StatefulWidget {
 
 class _PanelIndicadoresOperativosState
     extends State<PanelIndicadoresOperativos> {
-  Stream<List<Inscripcion>>? _inscripciones;
-  Stream<List<Pago>>? _pagos;
-  Stream<List<Busqueda>>? _busquedas;
+  Stream<LecturaOperativa<Inscripcion>>? _inscripciones;
+  Stream<LecturaOperativa<Pago>>? _pagos;
+  Stream<LecturaOperativa<Busqueda>>? _busquedas;
 
   @override
   void initState() {
@@ -48,9 +48,25 @@ class _PanelIndicadoresOperativosState
         (Firebase.apps.isNotEmpty
             ? FirestoreOperacionesDashboardRepository()
             : null);
-    _inscripciones = repositorio?.observarInscripciones();
-    _pagos = repositorio?.observarPagos();
-    _busquedas = repositorio?.observarBusquedasRecientes();
+    final diagnostico = repositorio is OperacionesDashboardDiagnosticoRepository
+        ? repositorio as OperacionesDashboardDiagnosticoRepository
+        : null;
+    if (diagnostico != null) {
+      _inscripciones = diagnostico.observarInscripcionesConDiagnostico();
+      _pagos = diagnostico.observarPagosConDiagnostico();
+      _busquedas = diagnostico.observarBusquedasConDiagnostico();
+    } else {
+      // Compatibilidad con repositorios simulados y contratos existentes.
+      _inscripciones = repositorio?.observarInscripciones().map(
+        (registros) => LecturaOperativa(registros: registros, omitidos: 0),
+      );
+      _pagos = repositorio?.observarPagos().map(
+        (registros) => LecturaOperativa(registros: registros, omitidos: 0),
+      );
+      _busquedas = repositorio?.observarBusquedasRecientes().map(
+        (registros) => LecturaOperativa(registros: registros, omitidos: 0),
+      );
+    }
   }
 
   @override
@@ -223,7 +239,7 @@ class _FuentePanel<T> extends StatelessWidget {
 
   final String titulo;
   final String clave;
-  final Stream<List<T>>? flujo;
+  final Stream<LecturaOperativa<T>>? flujo;
   final Widget Function(List<T>) contenido;
 
   @override
@@ -242,7 +258,7 @@ class _FuentePanel<T> extends StatelessWidget {
                 key: Key('a34-no-conectada-$clave'),
               )
             else
-              StreamBuilder<List<T>>(
+              StreamBuilder<LecturaOperativa<T>>(
                 stream: flujo,
                 builder: (context, estado) {
                   if (estado.hasError) {
@@ -261,14 +277,31 @@ class _FuentePanel<T> extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (estado.data!.isEmpty)
+                      if (estado.data!.omitidos > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            'Se omitieron ${estado.data!.omitidos} registros con datos inválidos.',
+                            key: Key('a38-omitidos-$clave'),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      if (estado.data!.registros.isEmpty &&
+                          estado.data!.omitidos == 0)
                         const Padding(
                           padding: EdgeInsets.only(bottom: 10),
                           child: Text(
                             'Consulta permitida; colección sin registros.',
                           ),
                         ),
-                      contenido(estado.data!),
+                      if (estado.data!.registros.isEmpty &&
+                          estado.data!.omitidos > 0)
+                        const Text(
+                          'No hay registros válidos para calcular indicadores.',
+                        ),
+                      contenido(estado.data!.registros),
                     ],
                   );
                 },
