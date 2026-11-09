@@ -5,6 +5,7 @@ import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/estudiante.dart';
 import 'package:saman_deportivo/models/inscripcion.dart';
+import 'package:saman_deportivo/models/pago.dart';
 import 'package:saman_deportivo/repositories/inscripcion_repository.dart';
 
 class FirestoreInscripcionRepository implements InscripcionRepository {
@@ -435,12 +436,110 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
   // 8. CONFIRMAR INSCRIPCIÓN DESPUÉS DEL PAGO
   // ---------------------------------------------------------
 
+  // Sin Cloud Functions (plan gratuito), el pago lo captura PayPal en el
+  // navegador y la app lo registra aquí. Las reglas de Firestore validan que
+  // el pago sea del estudiante, que el monto sea el costo del deporte y que
+  // las tres escrituras vayan juntas. Limitación conocida del modo sandbox:
+  // no se verifica la captura contra la API de PayPal (se audita en RF-12).
   @override
-  Future<void> confirmar(String inscripcionId, {required String pagoId}) {
-    // No se debe confirmar un pago únicamente con
-    // información proporcionada desde Flutter.
-    throw UnimplementedError(
-      'Confirmación pendiente de validación segura del pago.',
-    );
+  Future<void> confirmar(String inscripcionId, {required Pago pago}) async {
+    final usuario = auth.currentUser;
+
+    if (usuario == null || usuario.uid != pago.estudianteUid) {
+      throw const InscripcionException(
+        'Debes iniciar sesión con tu cuenta de estudiante.',
+      );
+    }
+
+    if (!pago.estaAprobado ||
+        pago.paypalCaptureId == null ||
+        pago.id != pago.paypalOrderId ||
+        pago.inscripcionId != inscripcionId) {
+      throw const InscripcionException('Los datos del pago no son válidos.');
+    }
+
+    final inscripcionRef = firestore
+        .collection('inscripciones')
+        .doc(inscripcionId);
+    final pagoRef = firestore.collection('pagos').doc(pago.id);
+
+    await firestore.runTransaction((transaction) async {
+      final inscripcionDoc = await transaction.get(inscripcionRef);
+
+      if (!inscripcionDoc.exists || inscripcionDoc.data() == null) {
+        throw const InscripcionException('La inscripción no existe.');
+      }
+
+      final inscripcion = Inscripcion.fromMap(
+        inscripcionId,
+        inscripcionDoc.data()!,
+      );
+
+      if (inscripcion.estudianteUid != usuario.uid) {
+        throw const InscripcionException(
+          'No puedes pagar una inscripción de otro estudiante.',
+        );
+      }
+
+      if (inscripcion.estado != EstadoInscripcion.pendiente) {
+        throw const InscripcionException(
+          'Esta inscripción ya no está pendiente de pago.',
+        );
+      }
+
+      final ahora = DateTime.now();
+
+      if (inscripcion.estaVencida(ahora)) {
+        throw const InscripcionException('El plazo de pago ya venció.');
+      }
+
+      final deporteRef = firestore
+          .collection('deportes')
+          .doc(inscripcion.deporteId);
+      final deporteDoc = await transaction.get(deporteRef);
+
+      if (!deporteDoc.exists || deporteDoc.data() == null) {
+        throw const InscripcionException('No se encontró el deporte asociado.');
+      }
+
+      final deporte = Deporte.fromMap(
+        inscripcion.deporteId,
+        deporteDoc.data()!,
+      );
+
+      if ((deporte.costo - pago.monto).abs() > 0.005) {
+        throw const InscripcionException(
+          'El monto pagado no coincide con el costo del deporte.',
+        );
+      }
+
+      if (deporte.cuposConfirmados >= deporte.cuposOcupados) {
+        throw const InscripcionException(
+          'Los contadores de cupos necesitan revisión.',
+        );
+      }
+
+      // No se lee pagos/{id} antes de crearlo: la regla de lectura de pagos
+      // falla con un documento inexistente y tumbaría la transacción. Las
+      // reglas ya rechazan un pago repetido (exigen que no exista antes).
+
+      transaction.set(pagoRef, pago.toMap());
+
+      transaction.update(inscripcionRef, {
+        'estado': EstadoInscripcion.confirmada.name,
+        'pagoId': pago.id,
+        'historial': FieldValue.arrayUnion([
+          CambioEstado(
+            estado: EstadoInscripcion.confirmada,
+            fecha: ahora,
+            responsableUid: usuario.uid,
+          ).toMap(),
+        ]),
+      });
+
+      transaction.update(deporteRef, {
+        'cuposConfirmados': deporte.cuposConfirmados + 1,
+      });
+    });
   }
 }
