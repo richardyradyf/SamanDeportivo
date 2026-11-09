@@ -47,7 +47,7 @@ void main() {
   testWidgets('fuente válida muestra porcentaje y totales', (tester) async {
     await mostrar(
       tester,
-      consultar: (_, __) => Stream.value(
+      consultar: (_, _) => Stream.value(
         LecturaAsistenciaAdmin(
           registros: [
             registro('a', EstadoAsistencia.presente, 'FUT-01'),
@@ -72,7 +72,7 @@ void main() {
   testWidgets('sin datos muestra ausencia, no 0 %', (tester) async {
     await mostrar(
       tester,
-      consultar: (_, __) =>
+      consultar: (_, _) =>
           Stream.value(const LecturaAsistenciaAdmin(registros: [])),
     );
     expect(find.byKey(const Key('h3-asistencia-sin-datos')), findsOneWidget);
@@ -82,7 +82,7 @@ void main() {
   testWidgets('error de permisos no se representa como cero', (tester) async {
     await mostrar(
       tester,
-      consultar: (_, __) => Stream.error(StateError('permission-denied')),
+      consultar: (_, _) => Stream.error(StateError('permission-denied')),
     );
     expect(find.byKey(const Key('h3-asistencia-error')), findsOneWidget);
     expect(find.text('0.0%'), findsNothing);
@@ -110,7 +110,7 @@ void main() {
   ) async {
     await mostrar(
       tester,
-      consultar: (_, __) => Stream.value(
+      consultar: (_, _) => Stream.value(
         const LecturaAsistenciaAdmin(registros: [], omitidos: 2),
       ),
     );
