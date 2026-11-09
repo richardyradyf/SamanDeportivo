@@ -1,3 +1,4 @@
+import 'package:saman_deportivo/features/admin/inscripciones/presentation/inscripciones_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/dashboard/presentation/dashboard_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/dashboard/presentation/analitica_admin_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -79,10 +80,7 @@ class InicioAdminScreen extends StatelessWidget {
           etiqueta: 'Inscripciones',
           icono: Icons.how_to_reg_outlined,
           iconoSeleccionado: Icons.how_to_reg,
-          pantalla: SeccionPendiente(
-            titulo: 'Inscripciones',
-            icono: Icons.how_to_reg,
-          ),
+          pantalla: InscripcionesAdminScreen(),
         ),
         const DestinoNavegacion(
           etiqueta: 'Analítica',
