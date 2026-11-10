@@ -49,3 +49,9 @@ app.*.map.json
 
 # Node.js
 node_modules/
+
+# Credenciales locales de Cloud Functions (nunca se suben)
+functions/.secret.local
+
+# Caché de Firebase Hosting
+.firebase/

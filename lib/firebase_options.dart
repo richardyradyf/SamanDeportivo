@@ -21,10 +21,7 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for android - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return android;
       case TargetPlatform.iOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for ios - '
@@ -58,6 +55,14 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1051069344303',
     projectId: 'saman-deportivo',
     authDomain: 'saman-deportivo.firebaseapp.com',
+    storageBucket: 'saman-deportivo.firebasestorage.app',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyCd17LWwEnxtXaII-lknXy6uctuhP9lWnA',
+    appId: '1:1051069344303:android:6d0e844f2f556027e634da',
+    messagingSenderId: '1051069344303',
+    projectId: 'saman-deportivo',
     storageBucket: 'saman-deportivo.firebasestorage.app',
   );
 }

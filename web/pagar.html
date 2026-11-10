@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Samán Deportivo · Pagar</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 1.5rem; display: flex; justify-content: center; }
+    main { width: 100%; max-width: 26rem; text-align: center; }
+    #error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <main>
+    <p id="detalle"></p>
+    <div id="botones"></div>
+    <p id="error"></p>
+  </main>
+  <script>
+    // Client ID de sandbox: es público (va en el navegador). El Secret ya no se usa.
+    const CLIENT_ID = 'BAAo9UyruR1SjkiCGGfmhAarjgCKRrePUw8q6yVzyciGW7YdC_4XvNOImvznoTUD5zQeOJHTI3pi4c4-PM';
+    const p = new URLSearchParams(location.search);
+    const inscripcion = p.get('inscripcion') || '';
+    const monto = Number(p.get('monto'));
+    const deporte = p.get('deporte') || 'Inscripción Samán Deportivo';
+    const mostrarError = (t) => { document.getElementById('error').textContent = t; };
+    const terminar = (datos) => location.replace('pago_resultado.html?' + new URLSearchParams(datos));
+
+    if (!inscripcion || !(monto > 0)) {
+      mostrarError('Faltan datos del pago.');
+    } else {
+      document.getElementById('detalle').textContent = `${deporte}: ${monto.toFixed(2)} USD`;
+      const sdk = document.createElement('script');
+      sdk.src = `https://www.paypal.com/sdk/js?client-id=${CLIENT_ID}&currency=USD`;
+      sdk.onerror = () => mostrarError('No se pudo cargar PayPal. Revisa tu conexión.');
+      sdk.onload = () => paypal.Buttons({
+        createOrder: (data, actions) => actions.order.create({
+          purchase_units: [{
+            custom_id: inscripcion,
+            description: `Reserva de cupo: ${deporte}`.slice(0, 120),
+            amount: { currency_code: 'USD', value: monto.toFixed(2) },
+          }],
+          application_context: { shipping_preference: 'NO_SHIPPING' },
+        }),
+        onApprove: async (data, actions) => {
+          const orden = await actions.order.capture();
+          const captura = orden.purchase_units[0].payments.captures[0];
+          terminar({ estado: orden.status, orderId: orden.id, captureId: captura.id, monto: captura.amount.value });
+        },
+        onCancel: () => terminar({ estado: 'CANCELLED' }),
+        onError: () => terminar({ estado: 'ERROR' }),
+      }).render('#botones');
+      document.head.appendChild(sdk);
+    }
+  </script>
+</body>
+</html>
