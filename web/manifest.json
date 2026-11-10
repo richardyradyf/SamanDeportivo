@@ -1,11 +1,12 @@
 {
-    "name": "saman_deportivo",
-    "short_name": "saman_deportivo",
-    "start_url": ".",
+    "name": "Samán Deportivo",
+    "short_name": "Samán",
+    "lang": "es",
+    "start_url": "/",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F6F9F7",
+    "theme_color": "#06452B",
+    "description": "Inscríbete en los deportes de la UNIMET, consulta horarios y cupos.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,0 +1,17 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {validarEntrenador,normalizarHorarios,seCruzan,validarSolicitudAgenda}=require('../lib/validaciones.cjs');
+const coach={nombre:'Carlos Rojas',correo:' Carlos@Saman.Test ',cedula:'12345678',especialidad:'Fútbol',aniosExperiencia:8};
+const lun={dia:'lunes',horaInicio:'16:00',horaFin:'18:00',lugar:'Cancha'};
+test('normaliza correo de entrenador',()=>assert.equal(validarEntrenador(coach).correo,'carlos@saman.test'));
+test('rechaza correo inválido',()=>assert.throws(()=>validarEntrenador({...coach,correo:'no-es-email'})));
+test('rechaza cédula inválida',()=>assert.throws(()=>validarEntrenador({...coach,cedula:'V-123'})));
+test('rechaza experiencia negativa',()=>assert.throws(()=>validarEntrenador({...coach,aniosExperiencia:-1})));
+test('horarios válidos',()=>assert.equal(normalizarHorarios([lun]).length,1));
+test('rechaza HH:mm inválido',()=>assert.throws(()=>normalizarHorarios([{...lun,horaInicio:'25:00'}])));
+test('rechaza intervalos negativos',()=>assert.throws(()=>normalizarHorarios([{...lun,horaInicio:'19:00'}])));
+test('detecta solapamientos',()=>assert.throws(()=>normalizarHorarios([lun,{...lun,horaInicio:'17:00',horaFin:'19:00'}])));
+test('horarios contiguos permitidos',()=>assert.equal(normalizarHorarios([lun,{...lun,horaInicio:'18:00',horaFin:'19:00'}]).length,2));
+test('distintos días no chocan',()=>assert.equal(seCruzan(lun,{...lun,dia:'martes'}),false));
+test('rechaza UID inválido',()=>assert.throws(()=>validarSolicitudAgenda({codigoDeporte:'FUT-01',entrenadorUid:'',expectedVersion:null,horarios:[]})));
+test('requiere versión para evitar actualizaciones obsoletas',()=>assert.throws(()=>validarSolicitudAgenda({codigoDeporte:'FUT-01',entrenadorUid:null,horarios:[]})));

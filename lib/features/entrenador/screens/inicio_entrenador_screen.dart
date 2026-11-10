@@ -17,6 +17,9 @@ class InicioEntrenadorScreen extends StatelessWidget {
     required this.nombre,
     required this.onCerrarSesion,
     this.perfil,
+    this.estudiantes,
+    this.asistencia,
+    this.historial,
   });
 
   final String nombre;
@@ -25,6 +28,12 @@ class InicioEntrenadorScreen extends StatelessWidget {
   /// Pantalla de perfil (módulo de Alexander). Mientras no exista, se
   /// muestra un aviso de "próximamente".
   final Widget? perfil;
+
+  /// Nómina, toma de asistencia e historial (módulo de Andrés). Si no se
+  /// pasan, se muestra "próximamente".
+  final Widget? estudiantes;
+  final Widget? asistencia;
+  final Widget? historial;
 
   @override
   Widget build(BuildContext context) {
@@ -52,29 +61,35 @@ class InicioEntrenadorScreen extends StatelessWidget {
             icono: Icons.sports,
           ),
         ),
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Estudiantes',
           icono: Icons.groups_outlined,
           iconoSeleccionado: Icons.groups,
-          pantalla: SeccionPendiente(
-            titulo: 'Estudiantes',
-            icono: Icons.groups,
-          ),
+          pantalla:
+              estudiantes ??
+              const SeccionPendiente(
+                titulo: 'Estudiantes',
+                icono: Icons.groups,
+              ),
         ),
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Asistencia',
           icono: Icons.fact_check_outlined,
           iconoSeleccionado: Icons.fact_check,
-          pantalla: SeccionPendiente(
-            titulo: 'Asistencia',
-            icono: Icons.fact_check,
-          ),
+          pantalla:
+              asistencia ??
+              const SeccionPendiente(
+                titulo: 'Asistencia',
+                icono: Icons.fact_check,
+              ),
         ),
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Historial',
           icono: Icons.history,
           iconoSeleccionado: Icons.history,
-          pantalla: SeccionPendiente(titulo: 'Historial', icono: Icons.history),
+          pantalla:
+              historial ??
+              const SeccionPendiente(titulo: 'Historial', icono: Icons.history),
         ),
         DestinoNavegacion(
           etiqueta: 'Perfil',

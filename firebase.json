@@ -1,1 +1,60 @@
-{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"saman-deportivo","configurations":{"web":"1:1051069344303:web:074fe20eaf7c3cefe634da"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "saman-deportivo",
+          "configurations": {
+            "android": "1:1051069344303:android:6d0e844f2f556027e634da",
+            "web": "1:1051069344303:web:074fe20eaf7c3cefe634da"
+          }
+        }
+      },
+      "android": {
+        "default": {
+          "projectId": "saman-deportivo",
+          "appId": "1:1051069344303:android:6d0e844f2f556027e634da",
+          "fileOutput": "android/app/google-services.json"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true,
+    "functions": {
+      "port": 5001
+    }
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22"
+  }
+}

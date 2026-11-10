@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
+import 'features/estudiante/inscripciones/data/firestore_inscripcion_repository.dart';
+import 'core/config/entorno.dart';
 import 'core/router/auth_gate.dart';
 import 'firebase_options.dart';
 import 'features/auth/controllers/sesion_controller.dart';
-import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/registro_screen.dart';
 import 'core/theme/app_theme.dart';
+import 'features/publico/inicio_publico.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Solo con --dart-define=USAR_EMULADOR=true (ver core/config/entorno.dart).
+  await conectarEmuladorSiCorresponde();
 
   runApp(
     // MultiProvider: aquí se registran TODOS los controllers globales.
@@ -41,8 +45,13 @@ class SamanDeportivoApp extends StatelessWidget {
       title: 'Samán Deportivo',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.claro,
-      home: const AuthGate(
-        sinSesion:  LoginScreen(),
+      home: AuthGate(
+        // Sin sesión se ve el landing con el catálogo público (Hito 4).
+        sinSesion: const InicioPublico(),
+        obtenerInscripciones:
+            FirestoreInscripcionRepository().observarDeEstudiante,
+        cancelarInscripcion: FirestoreInscripcionRepository().cancelar,
+        inscribirEstudiante: FirestoreInscripcionRepository().inscribirse,
       ),
     );
   }
