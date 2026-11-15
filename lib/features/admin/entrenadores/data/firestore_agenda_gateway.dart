@@ -15,11 +15,9 @@ import 'package:saman_deportivo/models/horario_sesion.dart';
 /// catalogo dentro de la transaccion. No usar como solucion escalable para
 /// miles de deportes sin migrar a indices de ocupacion por franja horaria.
 class FirestoreAgendaGateway implements AgendaMutaciones {
-  FirestoreAgendaGateway({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  }) : _db = firestore ?? FirebaseFirestore.instance,
-       _auth = auth ?? FirebaseAuth.instance;
+  FirestoreAgendaGateway({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
@@ -58,9 +56,9 @@ class FirestoreAgendaGateway implements AgendaMutaciones {
       const GetOptions(source: Source.server),
     );
     final versionEsperada = _version(controlPrevio.data());
-    final catalogo = await _db.collection('deportes').get(
-      const GetOptions(source: Source.server),
-    );
+    final catalogo = await _db
+        .collection('deportes')
+        .get(const GetOptions(source: Source.server));
 
     if (!catalogo.docs.any((doc) => doc.id == deporte.codigo)) {
       throw AgendaEntrenadorException(
@@ -145,10 +143,7 @@ class FirestoreAgendaGateway implements AgendaMutaciones {
 
       // Las agendas históricas no tienen espacioId y se migrarán desde la
       // interfaz. Toda referencia nueva debe apuntar a un espacio activo.
-      final ids = horarios
-          .map((h) => h.espacioId)
-          .whereType<String>()
-          .toSet();
+      final ids = horarios.map((h) => h.espacioId).whereType<String>().toSet();
       for (final id in ids) {
         final espacio = await tx.get(_db.collection('espacios').doc(id));
         if (espacio.data()?['activo'] != true) {

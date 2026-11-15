@@ -25,13 +25,15 @@ class _EspaciosFake implements EspacioRepository {
     String descripcion = '',
   }) async {
     final id = 'esp-${espacios.length + 1}';
-    espacios.add(EspacioDeportivo(
-      id: id,
-      nombre: nombre,
-      tipo: tipo,
-      descripcion: descripcion,
-      creadoEn: DateTime(2026, 11, 15),
-    ));
+    espacios.add(
+      EspacioDeportivo(
+        id: id,
+        nombre: nombre,
+        tipo: tipo,
+        descripcion: descripcion,
+        creadoEn: DateTime(2026, 11, 15),
+      ),
+    );
     _emitir();
     return id;
   }
@@ -53,21 +55,26 @@ class _EspaciosFake implements EspacioRepository {
 }
 
 void main() {
-  testWidgets('H4: registra una instalación desde la administración',
-      (tester) async {
+  testWidgets('H4: registra una instalación desde la administración', (
+    tester,
+  ) async {
     final repo = _EspaciosFake();
     addTearDown(repo.dispose);
-    await tester.pumpWidget(MaterialApp(
-      home: EspaciosAdminScreen(repositorio: repo),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(home: EspaciosAdminScreen(repositorio: repo)),
+    );
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('nuevo-espacio')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('nombre-espacio')),
-        'Cancha de tenis 1');
-    await tester.enterText(find.widgetWithText(TextFormField,
-        'Tipo de instalación'), 'Tenis');
+    await tester.enterText(
+      find.byKey(const Key('nombre-espacio')),
+      'Cancha de tenis 1',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tipo de instalación'),
+      'Tenis',
+    );
     await tester.tap(find.byKey(const Key('guardar-espacio')));
     await tester.pumpAndSettle();
 
@@ -76,14 +83,13 @@ void main() {
     expect(find.text('Cancha de tenis 1'), findsOneWidget);
   });
 
-  testWidgets('H4: puede desactivar sin borrar la instalación',
-      (tester) async {
+  testWidgets('H4: puede desactivar sin borrar la instalación', (tester) async {
     final repo = _EspaciosFake();
     addTearDown(repo.dispose);
     await repo.crear(nombre: 'Gimnasio 1', tipo: 'Gimnasio');
-    await tester.pumpWidget(MaterialApp(
-      home: EspaciosAdminScreen(repositorio: repo),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(home: EspaciosAdminScreen(repositorio: repo)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('estado-espacio-esp-1')));

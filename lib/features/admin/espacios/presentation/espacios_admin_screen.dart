@@ -24,7 +24,8 @@ class _EspaciosAdminScreenState extends State<EspaciosAdminScreen> {
   @override
   void initState() {
     super.initState();
-    _repositorio = widget.repositorio ??
+    _repositorio =
+        widget.repositorio ??
         (Firebase.apps.isEmpty ? null : FirestoreEspacioRepository());
     _espacios = _repositorio?.observarTodos();
     _busqueda.addListener(_actualizar);
@@ -49,11 +50,15 @@ class _EspaciosAdminScreenState extends State<EspaciosAdminScreen> {
       builder: (_) => _FormularioEspacio(repositorio: repo, inicial: espacio),
     );
     if (!mounted || guardado != true) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(espacio == null
-          ? 'Espacio registrado correctamente.'
-          : 'Espacio actualizado correctamente.'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          espacio == null
+              ? 'Espacio registrado correctamente.'
+              : 'Espacio actualizado correctamente.',
+        ),
+      ),
+    );
   }
 
   Future<void> _cambiarEstado(EspacioDeportivo espacio) async {
@@ -64,8 +69,10 @@ class _EspaciosAdminScreenState extends State<EspaciosAdminScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Desactivar espacio'),
-          content: Text('¿Desactivar ${espacio.nombre}? No se borrarán sus '
-              'horarios ni sus reservas existentes.'),
+          content: Text(
+            '¿Desactivar ${espacio.nombre}? No se borrarán sus '
+            'horarios ni sus reservas existentes.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -83,14 +90,18 @@ class _EspaciosAdminScreenState extends State<EspaciosAdminScreen> {
     try {
       await repo.cambiarEstado(espacio.id, activo: !espacio.activo);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(espacio.activo ? 'Espacio desactivado.' : 'Espacio activado.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            espacio.activo ? 'Espacio desactivado.' : 'Espacio activado.',
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('No se pudo cambiar el estado: $error'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cambiar el estado: $error')),
+      );
     }
   }
 
@@ -139,25 +150,42 @@ class _EspaciosAdminScreenState extends State<EspaciosAdminScreen> {
                       stream: _espacios,
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
-                          return Center(child: Text('Error al consultar espacios: '
-                              '${snapshot.error}'));
+                          return Center(
+                            child: Text(
+                              'Error al consultar espacios: '
+                              '${snapshot.error}',
+                            ),
+                          );
                         }
                         if (!snapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         }
-                        final filtro = normalizarBusqueda(_busqueda.text.trim());
-                        final resultado = snapshot.data!
-                            .where((e) => _mostrarInactivos || e.activo)
-                            .where((e) => normalizarBusqueda(e.nombre).contains(filtro)
-                                || normalizarBusqueda(e.tipo).contains(filtro))
-                            .toList()
-                          ..sort((a, b) => a.nombre.compareTo(b.nombre));
+                        final filtro = normalizarBusqueda(
+                          _busqueda.text.trim(),
+                        );
+                        final resultado =
+                            snapshot.data!
+                                .where((e) => _mostrarInactivos || e.activo)
+                                .where(
+                                  (e) =>
+                                      normalizarBusqueda(e.nombre)
+                                          .contains(filtro) ||
+                                      normalizarBusqueda(e.tipo)
+                                          .contains(filtro),
+                                )
+                                .toList()
+                              ..sort((a, b) => a.nombre.compareTo(b.nombre));
                         if (resultado.isEmpty) {
-                          return const Center(child: Text('No hay espacios con ese criterio.'));
+                          return const Center(
+                            child: Text('No hay espacios con ese criterio.'),
+                          );
                         }
                         return ListView.separated(
                           itemCount: resultado.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 10),
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final espacio = resultado[index];
                             return Card(
@@ -166,34 +194,63 @@ class _EspaciosAdminScreenState extends State<EspaciosAdminScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Wrap(spacing: 8, runSpacing: 6, children: [
-                                      Text(espacio.nombre,
-                                          style: Theme.of(context).textTheme.titleMedium),
-                                      Chip(label: Text(espacio.tipo)),
-                                      Chip(label: Text(espacio.activo ? 'Activo' : 'Inactivo')),
-                                    ]),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      children: [
+                                        Text(
+                                          espacio.nombre,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium,
+                                        ),
+                                        Chip(label: Text(espacio.tipo)),
+                                        Chip(
+                                          label: Text(
+                                            espacio.activo
+                                                ? 'Activo'
+                                                : 'Inactivo',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                     if (espacio.descripcion.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 8),
                                         child: Text(espacio.descripcion),
                                       ),
                                     const SizedBox(height: 8),
-                                    Wrap(spacing: 8, runSpacing: 8, children: [
-                                      OutlinedButton.icon(
-                                        key: Key('editar-espacio-${espacio.id}'),
-                                        onPressed: () => _formulario(espacio),
-                                        icon: const Icon(Icons.edit_outlined),
-                                        label: const Text('Editar'),
-                                      ),
-                                      OutlinedButton.icon(
-                                        key: Key('estado-espacio-${espacio.id}'),
-                                        onPressed: () => _cambiarEstado(espacio),
-                                        icon: Icon(espacio.activo
-                                            ? Icons.visibility_off_outlined
-                                            : Icons.visibility_outlined),
-                                        label: Text(espacio.activo ? 'Desactivar' : 'Activar'),
-                                      ),
-                                    ]),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        OutlinedButton.icon(
+                                          key: Key(
+                                            'editar-espacio-${espacio.id}',
+                                          ),
+                                          onPressed: () => _formulario(espacio),
+                                          icon: const Icon(Icons.edit_outlined),
+                                          label: const Text('Editar'),
+                                        ),
+                                        OutlinedButton.icon(
+                                          key: Key(
+                                            'estado-espacio-${espacio.id}',
+                                          ),
+                                          onPressed: () =>
+                                              _cambiarEstado(espacio),
+                                          icon: Icon(
+                                            espacio.activo
+                                                ? Icons.visibility_off_outlined
+                                                : Icons.visibility_outlined,
+                                          ),
+                                          label: Text(
+                                            espacio.activo
+                                                ? 'Desactivar'
+                                                : 'Activar',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -233,8 +290,9 @@ class _FormularioEspacioState extends State<_FormularioEspacio> {
     super.initState();
     _nombre = TextEditingController(text: widget.inicial?.nombre ?? '');
     _tipo = TextEditingController(text: widget.inicial?.tipo ?? '');
-    _descripcion =
-        TextEditingController(text: widget.inicial?.descripcion ?? '');
+    _descripcion = TextEditingController(
+      text: widget.inicial?.descripcion ?? '',
+    );
   }
 
   @override
@@ -247,15 +305,26 @@ class _FormularioEspacioState extends State<_FormularioEspacio> {
 
   Future<void> _guardar() async {
     if (_guardando || !_form.currentState!.validate()) return;
-    setState(() { _guardando = true; _error = null; });
+    setState(() {
+      _guardando = true;
+      _error = null;
+    });
     try {
       final actual = widget.inicial;
       if (actual == null) {
         await widget.repositorio.crear(
-          nombre: _nombre.text, tipo: _tipo.text, descripcion: _descripcion.text);
+          nombre: _nombre.text,
+          tipo: _tipo.text,
+          descripcion: _descripcion.text,
+        );
       } else {
-        await widget.repositorio.actualizar(actual.copyWith(
-          nombre: _nombre.text, tipo: _tipo.text, descripcion: _descripcion.text));
+        await widget.repositorio.actualizar(
+          actual.copyWith(
+            nombre: _nombre.text,
+            tipo: _tipo.text,
+            descripcion: _descripcion.text,
+          ),
+        );
       }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -273,31 +342,43 @@ class _FormularioEspacioState extends State<_FormularioEspacio> {
       child: SingleChildScrollView(
         child: Form(
           key: _form,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextFormField(
-              key: const Key('nombre-espacio'),
-              controller: _nombre,
-              decoration: const InputDecoration(labelText: 'Nombre'),
-              maxLength: 100,
-              validator: (v) => (v ?? '').trim().length < 3
-                  ? 'Escribe un nombre de al menos 3 caracteres.' : null,
-            ),
-            TextFormField(
-              controller: _tipo,
-              decoration: const InputDecoration(labelText: 'Tipo de instalación'),
-              maxLength: 60,
-              validator: (v) => (v ?? '').trim().isEmpty
-                  ? 'Indica el tipo de instalación.' : null,
-            ),
-            TextFormField(
-              controller: _descripcion,
-              decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
-              maxLength: 500,
-              maxLines: 3,
-            ),
-            if (_error != null) Text(_error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                key: const Key('nombre-espacio'),
+                controller: _nombre,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+                maxLength: 100,
+                validator: (v) => (v ?? '').trim().length < 3
+                    ? 'Escribe un nombre de al menos 3 caracteres.'
+                    : null,
+              ),
+              TextFormField(
+                controller: _tipo,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de instalación',
+                ),
+                maxLength: 60,
+                validator: (v) => (v ?? '').trim().isEmpty
+                    ? 'Indica el tipo de instalación.'
+                    : null,
+              ),
+              TextFormField(
+                controller: _descripcion,
+                decoration: const InputDecoration(
+                  labelText: 'Descripción (opcional)',
+                ),
+                maxLength: 500,
+                maxLines: 3,
+              ),
+              if (_error != null)
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+            ],
+          ),
         ),
       ),
     ),
