@@ -53,7 +53,8 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
             widget.deportes!,
             mutaciones: widget.agendaGateway,
           );
-    _espaciosRepositorio = widget.espacios ??
+    _espaciosRepositorio =
+        widget.espacios ??
         (Firebase.apps.isEmpty ? null : FirestoreEspacioRepository());
     _busqueda.addListener(_refrescar);
   }
@@ -116,8 +117,11 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
     if (!mounted) return;
     final actualizado = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          _DialogoHorarios(deporte: deporte, gestion: gestion, espacios: espacios),
+      builder: (context) => _DialogoHorarios(
+        deporte: deporte,
+        gestion: gestion,
+        espacios: espacios,
+      ),
     );
     if (!mounted || actualizado != true) {
       return;
@@ -190,9 +194,8 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
                 key: const Key('administrar-espacios'),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => EspaciosAdminScreen(
-                      repositorio: _espaciosRepositorio,
-                    ),
+                    builder: (_) =>
+                        EspaciosAdminScreen(repositorio: _espaciosRepositorio),
                   ),
                 ),
                 icon: const Icon(Icons.stadium_outlined),
@@ -628,8 +631,10 @@ class _DialogoHorariosState extends State<_DialogoHorarios> {
                           widget.espacios!.every((e) => !e.activo))
                         const Padding(
                           padding: EdgeInsets.only(top: 10),
-                          child: Text('Registra un espacio activo antes de '
-                              'programar nuevas sesiones.'),
+                          child: Text(
+                            'Registra un espacio activo antes de '
+                            'programar nuevas sesiones.',
+                          ),
                         ),
                       if (_error != null) ...[
                         const SizedBox(height: 10),
@@ -754,30 +759,37 @@ class _DialogoHorariosState extends State<_DialogoHorarios> {
           else
             DropdownButtonFormField<String>(
               key: Key('espacio-$indice'),
-              initialValue: widget.espacios!.any(
-                (e) => e.activo && e.id == horario.espacioId,
-              ) ? horario.espacioId : null,
+              initialValue:
+                  widget.espacios!.any(
+                    (e) => e.activo && e.id == horario.espacioId,
+                  )
+                  ? horario.espacioId
+                  : null,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Espacio deportivo'),
               items: [
                 for (final espacio in widget.espacios!.where((e) => e.activo))
                   DropdownMenuItem(
                     value: espacio.id,
-                    child: Text('${espacio.nombre} · ${espacio.tipo}',
-                        overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      '${espacio.nombre} · ${espacio.tipo}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
               ],
-              onChanged: _guardando ? null : (id) {
-                final seleccionado = widget.espacios!
-                    .where((e) => e.id == id)
-                    .firstOrNull;
-                setState(() {
-                  horario.espacioId = id;
-                  horario.lugar.text = seleccionado?.nombre ?? '';
-                });
-              },
-              validator: (id) => id == null
-                  ? 'Selecciona un espacio registrado.' : null,
+              onChanged: _guardando
+                  ? null
+                  : (id) {
+                      final seleccionado = widget.espacios!
+                          .where((e) => e.id == id)
+                          .firstOrNull;
+                      setState(() {
+                        horario.espacioId = id;
+                        horario.lugar.text = seleccionado?.nombre ?? '';
+                      });
+                    },
+              validator: (id) =>
+                  id == null ? 'Selecciona un espacio registrado.' : null,
             ),
         ],
       ),

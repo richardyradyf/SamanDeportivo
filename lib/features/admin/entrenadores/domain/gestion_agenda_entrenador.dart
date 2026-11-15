@@ -121,7 +121,9 @@ abstract final class ValidacionesAgendaEntrenador {
     required List<HorarioSesion> horarios,
     required Iterable<EspacioDeportivo> espacios,
   }) {
-    final disponibles = {for (final e in espacios.where((e) => e.activo)) e.id: e};
+    final disponibles = {
+      for (final e in espacios.where((e) => e.activo)) e.id: e,
+    };
     for (final horario in horarios) {
       // El catálogo histórico sin IDs se puede consultar, pero no se permite
       // programar una agenda nueva sin elegir una instalación registrada.

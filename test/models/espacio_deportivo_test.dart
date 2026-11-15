@@ -22,8 +22,10 @@ void main() {
 
   test('horario lee datos históricos sin espacioId', () {
     final horario = HorarioSesion.fromMap({
-      'dia': 'lunes', 'horaInicio': '16:00',
-      'horaFin': '18:00', 'lugar': 'Cancha A',
+      'dia': 'lunes',
+      'horaInicio': '16:00',
+      'horaFin': '18:00',
+      'lugar': 'Cancha A',
     });
     expect(horario.espacioId, isNull);
     expect(horario.lugar, 'Cancha A');

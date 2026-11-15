@@ -128,7 +128,9 @@ class _DeporteRepositoryFake implements DeporteRepository {
 void main() {
   group('A2 - validaciones de agenda', () {
     test('H4: un espacio no admite dos deportes solapados', () {
-      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])];
+      final deportes = [
+        _deporte('FUT-01', horarios: [_canchaUno16a18]),
+      ];
       expect(
         () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
           codigoDeporte: 'TEN-01',
@@ -140,7 +142,9 @@ void main() {
     });
 
     test('H4: dos instalaciones diferentes admiten la misma franja', () {
-      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])];
+      final deportes = [
+        _deporte('FUT-01', horarios: [_canchaUno16a18]),
+      ];
       expect(
         () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
           codigoDeporte: 'TEN-01',
@@ -152,7 +156,9 @@ void main() {
     });
 
     test('H4: horarios contiguos en una instalación son válidos', () {
-      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])];
+      final deportes = [
+        _deporte('FUT-01', horarios: [_canchaUno16a18]),
+      ];
       expect(
         () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
           codigoDeporte: 'TEN-01',
@@ -164,8 +170,9 @@ void main() {
     });
 
     test('H4: ignora deportes inactivos al consultar disponibilidad', () {
-      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])
-          .copyWith(activo: false)];
+      final deportes = [
+        _deporte('FUT-01', horarios: [_canchaUno16a18]).copyWith(activo: false),
+      ];
       expect(
         () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
           codigoDeporte: 'TEN-01',

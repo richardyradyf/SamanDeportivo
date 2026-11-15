@@ -16,7 +16,9 @@ class FirestoreEspacioRepository implements EspacioRepository {
       throw ArgumentError('El nombre debe tener entre 3 y 100 caracteres.');
     }
     if (tipo.trim().isEmpty || tipo.trim().length > 60) {
-      throw ArgumentError('El tipo de espacio debe tener de 1 a 60 caracteres.');
+      throw ArgumentError(
+        'El tipo de espacio debe tener de 1 a 60 caracteres.',
+      );
     }
     if (descripcion.trim().length > 500) {
       throw ArgumentError('La descripción no debe superar 500 caracteres.');
