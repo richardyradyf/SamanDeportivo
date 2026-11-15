@@ -6,6 +6,7 @@ import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_r
 import 'package:saman_deportivo/features/entrenador/asistencia/data/firestore_asistencia_repository.dart';
 import 'package:saman_deportivo/features/entrenador/asistencia/presentation/historial_asistencia_screen.dart';
 import 'package:saman_deportivo/features/entrenador/asistencia/presentation/tomar_asistencia_screen.dart';
+import 'package:saman_deportivo/features/entrenador/disciplinas/mis_disciplinas_screen.dart';
 import 'package:saman_deportivo/features/entrenador/nomina/presentation/nomina_screen.dart';
 import 'package:saman_deportivo/features/entrenador/widgets/con_deporte.dart';
 import 'package:saman_deportivo/models/deporte.dart';
@@ -28,7 +29,9 @@ ConfirmadasDeDeporte _confirmadasDe(String uid) =>
         .where('deporteId', isEqualTo: codigo)
         .where('estado', isEqualTo: 'confirmada')
         .snapshots()
-        .map((s) => [for (final d in s.docs) Inscripcion.fromMap(d.id, d.data())]);
+        .map(
+          (s) => [for (final d in s.docs) Inscripcion.fromMap(d.id, d.data())],
+        );
 
 class NominaFirebase extends StatelessWidget {
   const NominaFirebase({super.key, required this.uid});
@@ -37,11 +40,11 @@ class NominaFirebase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _conFirebase(
-        () => NominaScreen(
-          deportes: _deportesDe(uid),
-          confirmadas: _confirmadasDe(uid),
-        ),
-      );
+    () => NominaScreen(
+      deportes: _deportesDe(uid),
+      confirmadas: _confirmadasDe(uid),
+    ),
+  );
 }
 
 class TomarAsistenciaFirebase extends StatelessWidget {
@@ -51,13 +54,13 @@ class TomarAsistenciaFirebase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _conFirebase(
-        () => TomarAsistenciaScreen(
-          deportes: _deportesDe(uid),
-          confirmadas: _confirmadasDe(uid),
-          asistencias: FirestoreAsistenciaRepository(entrenadorUid: uid),
-          entrenadorUid: uid,
-        ),
-      );
+    () => TomarAsistenciaScreen(
+      deportes: _deportesDe(uid),
+      confirmadas: _confirmadasDe(uid),
+      asistencias: FirestoreAsistenciaRepository(entrenadorUid: uid),
+      entrenadorUid: uid,
+    ),
+  );
 }
 
 class HistorialAsistenciaFirebase extends StatelessWidget {
@@ -67,9 +70,19 @@ class HistorialAsistenciaFirebase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _conFirebase(
-        () => HistorialAsistenciaScreen(
-          deportes: _deportesDe(uid),
-          asistencias: FirestoreAsistenciaRepository(entrenadorUid: uid),
-        ),
-      );
+    () => HistorialAsistenciaScreen(
+      deportes: _deportesDe(uid),
+      asistencias: FirestoreAsistenciaRepository(entrenadorUid: uid),
+    ),
+  );
+}
+
+class MisDisciplinasFirebase extends StatelessWidget {
+  const MisDisciplinasFirebase({super.key, required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context) =>
+      _conFirebase(() => MisDisciplinasScreen(deportes: _deportesDe(uid)));
 }
