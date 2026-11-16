@@ -50,6 +50,14 @@ abstract final class ValidacionesReserva {
     DateTime finB,
   ) => inicioA.isBefore(finB) && inicioB.isBefore(finA);
 
+  /// Se reutiliza en la agenda administrativa para impedir que un nuevo
+  /// horario semanal invada una reserva particular ya confirmada.
+  static bool reservaCruzaClaseSemanal({
+    required DateTime inicioReserva,
+    required DateTime finReserva,
+    required HorarioSesion horario,
+  }) => _cruzaClaseSemanal(inicioReserva, finReserva, horario);
+
   /// Lista los bloques ocupados de un espacio para una vista de calendario.
   /// La pantalla consulta un rango visible de hasta 31 días; esto NO limita
   /// la duración ni anticipación de reservas de entrenadores y administradores.
