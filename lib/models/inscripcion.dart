@@ -46,6 +46,7 @@ class Inscripcion {
   final String estudianteNombre;
   final String estudianteCarnet;
   final String estudianteCorreo;
+  final String? estudianteTelefono;
 
   /// Código del deporte.
   final String deporteId;
@@ -68,6 +69,7 @@ class Inscripcion {
     required this.estudianteNombre,
     required this.estudianteCarnet,
     required this.estudianteCorreo,
+    this.estudianteTelefono,
     required this.deporteId,
     required this.deporteNombre,
     required this.estado,
@@ -99,6 +101,7 @@ class Inscripcion {
       estudianteNombre: estudiante.nombre,
       estudianteCarnet: estudiante.carnet,
       estudianteCorreo: estudiante.correo,
+      estudianteTelefono: estudiante.telefono,
       deporteId: deporte.codigo,
       deporteNombre: deporte.nombre,
       entrenadorUid: deporte.entrenadorUid,
@@ -144,6 +147,7 @@ class Inscripcion {
       estudianteNombre: nueva.estudianteNombre,
       estudianteCarnet: nueva.estudianteCarnet,
       estudianteCorreo: nueva.estudianteCorreo,
+      estudianteTelefono: nueva.estudianteTelefono,
       deporteId: nueva.deporteId,
       deporteNombre: nueva.deporteNombre,
       entrenadorUid: nueva.entrenadorUid,
@@ -175,6 +179,7 @@ class Inscripcion {
       estudianteNombre: estudianteNombre,
       estudianteCarnet: estudianteCarnet,
       estudianteCorreo: estudianteCorreo,
+      estudianteTelefono: estudianteTelefono,
       deporteId: deporteId,
       deporteNombre: deporteNombre,
       entrenadorUid: entrenadorUid,
@@ -185,7 +190,11 @@ class Inscripcion {
       pagoId: pagoId ?? this.pagoId,
       historial: [
         ...historial,
-        CambioEstado(estado: nuevo, fecha: cuando, responsableUid: responsableUid),
+        CambioEstado(
+          estado: nuevo,
+          fecha: cuando,
+          responsableUid: responsableUid,
+        ),
       ],
     );
   }
@@ -197,6 +206,8 @@ class Inscripcion {
       'estudianteNombre': estudianteNombre,
       'estudianteCarnet': estudianteCarnet,
       'estudianteCorreo': estudianteCorreo,
+      if (estudianteTelefono?.isNotEmpty ?? false)
+        'estudianteTelefono': estudianteTelefono,
       'deporteId': deporteId,
       'deporteNombre': deporteNombre,
       'entrenadorUid': entrenadorUid,
@@ -221,6 +232,7 @@ class Inscripcion {
       estudianteNombre: datos['estudianteNombre'] as String? ?? '',
       estudianteCarnet: datos['estudianteCarnet'] as String? ?? '',
       estudianteCorreo: datos['estudianteCorreo'] as String? ?? '',
+      estudianteTelefono: datos['estudianteTelefono'] as String?,
       deporteId: datos['deporteId'] as String? ?? '',
       deporteNombre: datos['deporteNombre'] as String? ?? '',
       entrenadorUid: datos['entrenadorUid'] as String?,

@@ -350,3 +350,83 @@ test(
     await verificarEstado('rechazada', 0, 2);
   }
 );
+
+
+// H4 Mariana: telefono actualizado al reinscribirse.
+
+test('H4-TEL-07: permite actualizar el telefono al reinscribirse', async () => {
+  const original = await sembrarInscripcion('cancelada');
+
+  await env.withSecurityRulesDisabled(async (contexto) => {
+    const db = contexto.firestore();
+
+    await updateDoc(doc(db, 'usuarios', uid), {
+      telefono: '+584149876543',
+    });
+
+    await updateDoc(doc(db, 'inscripciones', inscripcionId), {
+      estudianteTelefono: '+584121234567',
+    });
+  });
+
+  await assertSucceeds(
+    intentarReinscripcion({
+      ...nuevaSolicitud(original),
+      estudianteTelefono: '+584149876543',
+    })
+  );
+
+  await verificarEstado('pendiente', 1, 3);
+
+  const registro = await getDoc(
+    doc(estudiante(), 'inscripciones', inscripcionId)
+  );
+
+  assert.equal(registro.data().estudianteTelefono, '+584149876543');
+});
+
+test('H4-TEL-08: rechaza un telefono inventado en la reinscripcion', async () => {
+  const original = await sembrarInscripcion('cancelada');
+
+  await env.withSecurityRulesDisabled(async (contexto) => {
+    await updateDoc(
+      doc(contexto.firestore(), 'usuarios', uid),
+      { telefono: '+584121234567' }
+    );
+  });
+
+  await assertFails(
+    intentarReinscripcion({
+      ...nuevaSolicitud(original),
+      estudianteTelefono: '+584149876543',
+    })
+  );
+
+  await verificarEstado('cancelada', 0, 2);
+});
+
+test('H4-TEL-09: permite agregar telefono a una inscripcion historica', async () => {
+  const original = await sembrarInscripcion('cancelada');
+
+  await env.withSecurityRulesDisabled(async (contexto) => {
+    await updateDoc(
+      doc(contexto.firestore(), 'usuarios', uid),
+      { telefono: '+584121234567' }
+    );
+  });
+
+  await assertSucceeds(
+    intentarReinscripcion({
+      ...nuevaSolicitud(original),
+      estudianteTelefono: '+584121234567',
+    })
+  );
+
+  await verificarEstado('pendiente', 1, 3);
+
+  const registro = await getDoc(
+    doc(estudiante(), 'inscripciones', inscripcionId)
+  );
+
+  assert.equal(registro.data().estudianteTelefono, '+584121234567');
+});
