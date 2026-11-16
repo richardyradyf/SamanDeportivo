@@ -10,11 +10,16 @@ class HorarioSesion {
   final String horaFin;
   final String lugar;
 
+  /// Referencia estable a `espacios/{espacioId}`. Las agendas históricas
+  /// conservan solamente [lugar] hasta que un administrador las migre.
+  final String? espacioId;
+
   const HorarioSesion({
     required this.dia,
     required this.horaInicio,
     required this.horaFin,
     required this.lugar,
+    this.espacioId,
   });
 
   /// Minutos desde las 00:00, para comparar horas.
@@ -45,6 +50,7 @@ class HorarioSesion {
       'horaInicio': horaInicio,
       'horaFin': horaFin,
       'lugar': lugar,
+      if (espacioId != null) 'espacioId': espacioId,
     };
   }
 
@@ -54,6 +60,7 @@ class HorarioSesion {
       horaInicio: datos['horaInicio'] as String? ?? '00:00',
       horaFin: datos['horaFin'] as String? ?? '00:00',
       lugar: datos['lugar'] as String? ?? '',
+      espacioId: datos['espacioId'] as String?,
     );
   }
 }

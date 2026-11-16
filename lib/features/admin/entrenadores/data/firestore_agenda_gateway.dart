@@ -137,6 +137,32 @@ class FirestoreAgendaGateway implements AgendaMutaciones {
         );
       }
 
+      ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
+        codigoDeporte: deporte.codigo,
+        horarios: horarios,
+        deportes: actuales,
+      );
+
+      // Las agendas históricas no tienen espacioId y se migrarán desde la
+      // interfaz. Toda referencia nueva debe apuntar a un espacio activo.
+      final ids = horarios
+          .map((h) => h.espacioId)
+          .whereType<String>()
+          .toSet();
+      for (final id in ids) {
+        final espacio = await tx.get(_db.collection('espacios').doc(id));
+        if (espacio.data()?['activo'] != true) {
+          throw const AgendaEntrenadorException(
+            'El espacio seleccionado no existe o está inactivo. Recarga.',
+          );
+        }
+      }
+      if (ids.isNotEmpty && horarios.any((h) => h.espacioId == null)) {
+        throw const AgendaEntrenadorException(
+          'Todas las sesiones nuevas deben elegir un espacio registrado.',
+        );
+      }
+
       final dias = horarios.map((h) => h.dia.name).toSet().toList();
       tx.update(destino, <String, dynamic>{
         'entrenadorUid': entrenadorUid,
