@@ -60,14 +60,17 @@ Inscripcion _inscripcion(String codigo, EstadoInscripcion estado) {
     deporteNombre: codigo == 'FUT-01' ? 'Fútbol sala' : 'Natación',
     estado: estado,
     fechaInscripcion: fecha,
-    fechaLimitePago: fecha.add(const Duration(hours: 24)),
+    fechaLimitePago: estado == EstadoInscripcion.pendiente
+        ? DateTime(2099, 11, 6)
+        : fecha.add(const Duration(hours: 24)),
   );
 }
 
 Future<void> _abrirFutbol(
   WidgetTester tester,
-  Stream<List<Inscripcion>> inscripciones,
-) async {
+  Stream<List<Inscripcion>> inscripciones, {
+  Widget? pagos,
+}) async {
   tester.view.physicalSize = const Size(400, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -83,6 +86,7 @@ Future<void> _abrirFutbol(
         deportes: _DeportesFalsos(),
         resenas: _ResenasFalsas(),
         inscripcionesStream: inscripciones,
+        pagos: pagos,
       ),
     ),
   );
@@ -167,11 +171,30 @@ void main() {
 
       await _abrirFutbol(tester, inscripciones());
       expect(find.text('Publicar reseña'), findsNothing);
+      expect(find.text('Confirmar Pago'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 5));
       await tester.pump();
 
       expect(find.text('Publicar reseña'), findsOneWidget);
+      expect(find.text('Ya estás inscrito!'), findsOneWidget);
+      expect(find.text('Confirmar Pago'), findsNothing);
+    });
+
+    testWidgets('confirmar pago abre la pantalla de pagos existente', (
+      tester,
+    ) async {
+      await _abrirFutbol(
+        tester,
+        Stream.value([_inscripcion('FUT-01', EstadoInscripcion.pendiente)]),
+        pagos: const Center(child: Text('PAGOS DE PRUEBA')),
+      );
+
+      await tester.ensureVisible(find.text('Confirmar Pago'));
+      await tester.tap(find.text('Confirmar Pago'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('PAGOS DE PRUEBA'), findsOneWidget);
     });
   });
 

@@ -164,46 +164,74 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
         // a confirmada y el formulario de reseña aparece sin recargar.
         builder: (_) => ValueListenableBuilder<List<Inscripcion>?>(
           valueListenable: _inscripciones,
-          builder: (context, inscripciones, _) => DetalleDeporteScreen(
-            deporte: deporte,
-            deportes: widget.deportes,
-            resenas: widget.resenas,
-            estudianteUid: widget.uid,
-            estudianteNombre: widget.nombre,
-            puedeResenar: tieneInscripcionConfirmada(
-              inscripciones,
-              deporte.codigo,
-            ),
-            onInscribirse: onInscribirse == null
-                ? null
-                : (deporteSeleccionado) async {
-                    try {
-                      await onInscribirse(deporteSeleccionado);
+          builder: (context, inscripciones, _) {
+            Inscripcion? inscripcionActual;
+            for (final inscripcion in inscripciones ?? const <Inscripcion>[]) {
+              if (inscripcion.deporteId == deporte.codigo) {
+                inscripcionActual = inscripcion;
+                break;
+              }
+            }
+            return DetalleDeporteScreen(
+              deporte: deporte,
+              deportes: widget.deportes,
+              resenas: widget.resenas,
+              estudianteUid: widget.uid,
+              estudianteNombre: widget.nombre,
+              inscripcion: inscripcionActual,
+              verificandoInscripcion:
+                  widget.inscripcionesStream != null && inscripciones == null,
+              onConfirmarPago: widget.pagos == null
+                  ? null
+                  : (_) => _abrirPagos(context),
+              puedeResenar: tieneInscripcionConfirmada(
+                inscripciones,
+                deporte.codigo,
+              ),
+              onInscribirse: onInscribirse == null
+                  ? null
+                  : (deporteSeleccionado) async {
+                      try {
+                        await onInscribirse(deporteSeleccionado);
 
-                      if (!context.mounted) return;
+                        if (!context.mounted) return;
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Inscripción creada correctamente. '
-                            'Está pendiente de pago.',
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Inscripción creada correctamente. '
+                              'Está pendiente de pago.',
+                            ),
                           ),
-                        ),
-                      );
-                    } catch (error) {
-                      if (!context.mounted) return;
+                        );
+                      } catch (error) {
+                        if (!context.mounted) return;
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'No se pudo completar la inscripción. '
-                            'Verifica los cupos y vuelve a intentarlo.',
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'No se pudo completar la inscripción. '
+                              'Verifica los cupos y vuelve a intentarlo.',
+                            ),
                           ),
-                        ),
-                      );
-                    }
-                  },
-          ),
+                        );
+                      }
+                    },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _abrirPagos(BuildContext context) {
+    final paginaPagos = widget.pagos;
+    if (paginaPagos == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Pagos')),
+          body: paginaPagos,
         ),
       ),
     );
@@ -216,24 +244,15 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
       PanelBienvenida.saludoSegunHora(ahora),
       widget.nombre,
     );
-    final paginaPagos = widget.pagos;
-
     return LayoutResponsivo(
       titulo: 'Samán',
       subtitulo: Rol.estudiante.etiqueta,
       acciones: [
-        if (paginaPagos != null)
+        if (widget.pagos != null)
           IconButton(
             tooltip: 'Pagos',
             icon: const Icon(Icons.payments_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(title: const Text('Pagos')),
-                  body: paginaPagos,
-                ),
-              ),
-            ),
+            onPressed: () => _abrirPagos(context),
           ),
         BotonCerrarSesion(onConfirmar: widget.onCerrarSesion),
       ],
