@@ -30,6 +30,34 @@ const _martes16a18 = HorarioSesion(
   horaFin: '18:00',
   lugar: 'Gimnasio',
 );
+const _canchaUno16a18 = HorarioSesion(
+  dia: DiaSemana.lunes,
+  horaInicio: '16:00',
+  horaFin: '18:00',
+  lugar: 'Cancha de tenis 1',
+  espacioId: 'esp-tenis-1',
+);
+const _canchaUno17a19 = HorarioSesion(
+  dia: DiaSemana.lunes,
+  horaInicio: '17:00',
+  horaFin: '19:00',
+  lugar: 'Cancha de tenis 1',
+  espacioId: 'esp-tenis-1',
+);
+const _canchaDos17a19 = HorarioSesion(
+  dia: DiaSemana.lunes,
+  horaInicio: '17:00',
+  horaFin: '19:00',
+  lugar: 'Cancha de tenis 2',
+  espacioId: 'esp-tenis-2',
+);
+const _canchaUno18a20 = HorarioSesion(
+  dia: DiaSemana.lunes,
+  horaInicio: '18:00',
+  horaFin: '20:00',
+  lugar: 'Cancha de tenis 1',
+  espacioId: 'esp-tenis-1',
+);
 
 const _entrenador = Entrenador(
   uid: 'ent-1',
@@ -99,6 +127,55 @@ class _DeporteRepositoryFake implements DeporteRepository {
 
 void main() {
   group('A2 - validaciones de agenda', () {
+    test('H4: un espacio no admite dos deportes solapados', () {
+      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])];
+      expect(
+        () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
+          codigoDeporte: 'TEN-01',
+          horarios: [_canchaUno17a19],
+          deportes: deportes,
+        ),
+        throwsA(isA<AgendaEntrenadorException>()),
+      );
+    });
+
+    test('H4: dos instalaciones diferentes admiten la misma franja', () {
+      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])];
+      expect(
+        () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
+          codigoDeporte: 'TEN-01',
+          horarios: [_canchaDos17a19],
+          deportes: deportes,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('H4: horarios contiguos en una instalación son válidos', () {
+      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])];
+      expect(
+        () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
+          codigoDeporte: 'TEN-01',
+          horarios: [_canchaUno18a20],
+          deportes: deportes,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('H4: ignora deportes inactivos al consultar disponibilidad', () {
+      final deportes = [_deporte('FUT-01', horarios: [_canchaUno16a18])
+          .copyWith(activo: false)];
+      expect(
+        () => ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
+          codigoDeporte: 'TEN-01',
+          horarios: [_canchaUno17a19],
+          deportes: deportes,
+        ),
+        returnsNormally,
+      );
+    });
+
     test('admite horarios contiguos sin solapamiento', () {
       expect(
         () => ValidacionesAgendaEntrenador.validarHorarios([
