@@ -1115,6 +1115,14 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Proyección pública estrictamente sin datos personales. El cliente
+    // todavía no puede escribir aquí hasta incorporar la transacción de
+    // reservas y la comprobación de getAfter() en el siguiente PR.
+    match /ocupacionesEspacios/{ocupacionId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
     match /deportes/{codigo} {
       // La lectura del catalogo es publica (RF-05). No incluir datos privados.
       allow get, list: if true;

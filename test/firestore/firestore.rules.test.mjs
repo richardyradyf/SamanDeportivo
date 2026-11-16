@@ -34,6 +34,23 @@ after(async () => { if (env) await env.cleanup(); });
 const estudiante = () => env.authenticatedContext('uid-a', { email: 'uno@unimet.edu.ve' }).firestore();
 const admin = () => env.authenticatedContext('uid-admin', { email: 'admin@unimet.edu.ve' }).firestore();
 
+test('disponibilidad pública no permite escrituras de clientes', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'ocupacionesEspacios', 'reserva-demo'), {
+      espacioId: 'cancha-1',
+      inicio: new Date('2026-11-20T14:00:00Z'),
+      fin: new Date('2026-11-20T16:00:00Z'),
+    });
+  });
+  const anon = env.unauthenticatedContext().firestore();
+  await assertSucceeds(getDocs(collection(anon, 'ocupacionesEspacios')));
+  await assertFails(setDoc(doc(estudiante(), 'ocupacionesEspacios', 'fraude'), {
+    espacioId: 'cancha-1',
+    inicio: new Date('2026-11-20T14:00:00Z'),
+    fin: new Date('2026-11-20T16:00:00Z'),
+  }));
+});
+
 test('estudiante consulta su propio perfil', async () => {
   await assertSucceeds(getDoc(doc(estudiante(), 'usuarios', 'uid-a')));
 });
