@@ -1,5 +1,6 @@
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/entrenador.dart';
+import 'package:saman_deportivo/models/espacio_deportivo.dart';
 import 'package:saman_deportivo/models/horario_sesion.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 
@@ -82,6 +83,59 @@ abstract final class ValidacionesAgendaEntrenador {
       }
     }
   }
+
+  /// Reglas físicas independientes del entrenador: diferentes disciplinas
+  /// nunca comparten instalación en horas solapadas del mismo día.
+  static void validarSinConflictosDeEspacio({
+    required String codigoDeporte,
+    required List<HorarioSesion> horarios,
+    required Iterable<Deporte> deportes,
+  }) {
+    validarHorarios(horarios);
+    for (final otro in deportes) {
+      if (otro.codigo == codigoDeporte || !otro.activo) continue;
+      for (final propuesta in horarios) {
+        for (final existente in otro.horarios) {
+          if (propuesta.seCruzaCon(existente) &&
+              _mismoEspacio(propuesta, existente)) {
+            throw AgendaEntrenadorException(
+              'El espacio ${propuesta.lugar} ya está ocupado por '
+              '${otro.nombre} (${existente.resumen}).',
+            );
+          }
+        }
+      }
+    }
+  }
+
+  /// Compatibilidad con las clases antiguas sin espacioId. La agenda nueva
+  /// utiliza el ID; el nombre histórico se compara de forma conservadora.
+  static bool _mismoEspacio(HorarioSesion a, HorarioSesion b) {
+    if (a.espacioId != null && b.espacioId != null) {
+      return a.espacioId == b.espacioId;
+    }
+    return a.lugar.trim().toLowerCase() == b.lugar.trim().toLowerCase();
+  }
+
+  static void validarEspaciosActivos({
+    required List<HorarioSesion> horarios,
+    required Iterable<EspacioDeportivo> espacios,
+  }) {
+    final disponibles = {
+      for (final e in espacios.where((e) => e.activo)) e.id: e,
+    };
+    for (final horario in horarios) {
+      // El catálogo histórico sin IDs se puede consultar, pero no se permite
+      // programar una agenda nueva sin elegir una instalación registrada.
+      final espacio = disponibles[horario.espacioId];
+      if (espacio == null) {
+        throw AgendaEntrenadorException(
+          'Selecciona un espacio activo del catálogo para '
+          '${horario.dia.etiqueta} ${horario.horaInicio}.',
+        );
+      }
+    }
+  }
 }
 
 /// Casos de uso administrativos de A2, basados en el contrato de Richard.
@@ -125,6 +179,11 @@ class GestionAgendaEntrenador {
     final actual = _deportePorCodigo(todos, codigoDeporte);
     ValidacionesAgendaEntrenador.validarSinSolapamientos(
       entrenadorUid: entrenador.uid,
+      codigoDeporte: codigoDeporte,
+      horarios: horarios,
+      deportes: todos,
+    );
+    ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
       codigoDeporte: codigoDeporte,
       horarios: horarios,
       deportes: todos,
@@ -180,6 +239,11 @@ class GestionAgendaEntrenador {
         deportes: todos,
       );
     }
+    ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
+      codigoDeporte: codigoDeporte,
+      horarios: horarios,
+      deportes: todos,
+    );
     if (_mutaciones != null) {
       await _mutaciones.guardarAgenda(
         deporte: actual,
