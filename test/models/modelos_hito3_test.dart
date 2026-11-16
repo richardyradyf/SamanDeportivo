@@ -16,6 +16,23 @@ void main() {
     carnet: '20231234',
   );
 
+  group('Perfil de estudiante', () {
+    test('conserva teléfono E.164 al serializar y editar', () {
+      final conTelefono = estudiante.copyWith(telefono: '+584121234567');
+      final restaurado = Estudiante.fromMap(
+        estudiante.uid,
+        conTelefono.toMap(),
+      );
+      expect(restaurado.telefono, '+584121234567');
+      expect(restaurado.cedula, '28000000');
+    });
+
+    test('puede leer perfiles anteriores sin teléfono', () {
+      expect(Estudiante.fromMap(estudiante.uid, estudiante.toMap()).telefono,
+          isNull);
+    });
+  });
+
   group('HorarioSesion', () {
     const lunes16a18 = HorarioSesion(
       dia: DiaSemana.lunes, horaInicio: '16:00', horaFin: '18:00', lugar: 'A');

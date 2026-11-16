@@ -19,6 +19,7 @@ void main() {
         nombre: 'Mariana Di Buongrazio',
         cedula: '30124915',
         carnet: '20260001',
+        telefono: '+584121234567',
         correo: 'estudiante@correo.unimet.edu.ve',
         contrasena: 'Clave123',
       );
@@ -31,6 +32,7 @@ void main() {
         nombre: 'Mariana',
         cedula: '30124915',
         carnet: '20260001',
+        telefono: '+584121234567',
         correo: 'estudiante@unimet.edu.ve',
         contrasena: 'Clave123',
       );
@@ -43,6 +45,7 @@ void main() {
         nombre: 'Mariana Perez',
         cedula: 'V30124915',
         carnet: '20260001',
+        telefono: '+584121234567',
         correo: 'estudiante@unimet.edu.ve',
         contrasena: 'Clave123',
       );
@@ -58,26 +61,28 @@ void main() {
         nombre: 'Mariana Perez',
         cedula: '30124915',
         carnet: '20260001',
+        telefono: '+584121234567',
         correo: 'estudiante@gmail.com',
         contrasena: 'Clave123',
       );
 
       expect(
         resultado,
-        'Debes utilizar un correo institucional UNIMET',
+        'Debes utilizar un correo @correo.unimet.edu.ve',
       );
     });
 
-    test('Acepta el dominio unimet.edu.ve', () {
+    test('Rechaza el dominio antiguo unimet.edu.ve', () {
       final resultado = controller.validarDatos(
         nombre: 'Mariana Perez',
         cedula: '30124915',
         carnet: '20260001',
+        telefono: '+584121234567',
         correo: 'estudiante@unimet.edu.ve',
         contrasena: 'Clave123',
       );
 
-      expect(resultado, isNull);
+      expect(resultado, 'Debes utilizar un correo @correo.unimet.edu.ve');
     });
 
     test('Rechaza contrasenas menores a 6 caracteres', () {
@@ -85,7 +90,8 @@ void main() {
         nombre: 'Mariana Perez',
         cedula: '30124915',
         carnet: '20260001',
-        correo: 'estudiante@unimet.edu.ve',
+        telefono: '+584121234567',
+        correo: 'estudiante@correo.unimet.edu.ve',
         contrasena: '123',
       );
 

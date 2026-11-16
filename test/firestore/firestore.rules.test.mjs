@@ -169,7 +169,7 @@ test('administrador NO puede cambiar su propio rol', async () => {
 const nuevoRegistro = (estado = 'activo') => ({
   cedula: '12345678',
   nombre: 'Estudiante Registro',
-  correo: 'registro@unimet.edu.ve',
+  correo: 'registro@correo.unimet.edu.ve',
   rol: 'estudiante',
   carnet: '202644444',
   estado,
@@ -178,7 +178,7 @@ const nuevoRegistro = (estado = 'activo') => ({
 test('estudiante puede registrarse activo con los 6 campos acordados', async () => {
   const uid = 'uid-registro-valido';
   const db = env.authenticatedContext(uid, {
-    email: 'registro@unimet.edu.ve',
+    email: 'registro@correo.unimet.edu.ve',
   }).firestore();
 
   const batch = writeBatch(db);
@@ -197,7 +197,7 @@ test('estudiante puede registrarse activo con los 6 campos acordados', async () 
 test('estudiante NO puede registrarse como inactivo', async () => {
   const uid = 'uid-registro-inactivo';
   const db = env.authenticatedContext(uid, {
-    email: 'registro@unimet.edu.ve',
+    email: 'registro@correo.unimet.edu.ve',
   }).firestore();
 
   await assertFails(
@@ -208,7 +208,7 @@ test('estudiante NO puede registrarse como inactivo', async () => {
 test('registro con 9 campos adicionales debe rechazarse', async () => {
   const uid = 'uid-registro-nueve-campos';
   const db = env.authenticatedContext(uid, {
-    email: 'registro@unimet.edu.ve',
+    email: 'registro@correo.unimet.edu.ve',
   }).firestore();
 
   await assertFails(
