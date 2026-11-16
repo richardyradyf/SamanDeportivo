@@ -16,6 +16,14 @@
         { "fieldPath": "estudianteUid", "order": "ASCENDING" },
         { "fieldPath": "fecha", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "ocupacionesEspacios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "espacioId", "order": "ASCENDING" },
+        { "fieldPath": "inicio", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
