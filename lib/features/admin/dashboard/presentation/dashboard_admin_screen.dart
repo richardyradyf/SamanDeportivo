@@ -1,4 +1,5 @@
 import 'package:saman_deportivo/features/admin/dashboard/presentation/panel_indicadores_operativos.dart';
+import 'package:saman_deportivo/features/admin/dashboard/presentation/panel_asistencia_admin.dart';
 import 'package:saman_deportivo/features/admin/administracion/presentation/estudiantes_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/administracion/presentation/resenas_admin_screen.dart';
 import 'package:flutter/material.dart';
@@ -137,6 +138,8 @@ class _ContenidoDashboard extends StatelessWidget {
                   ],
                 ),
         ),
+        const SizedBox(height: 16),
+        const PanelAsistenciaAdmin(),
         const SizedBox(height: 16),
         Wrap(
           spacing: 12,
