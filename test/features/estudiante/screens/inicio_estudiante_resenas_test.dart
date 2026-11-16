@@ -177,7 +177,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Publicar reseña'), findsOneWidget);
-      expect(find.text('Ya estás inscrito!'), findsOneWidget);
+      expect(find.text('¡Ya estás inscrito!'), findsOneWidget);
       expect(find.text('Confirmar Pago'), findsNothing);
     });
 
