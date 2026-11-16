@@ -51,6 +51,7 @@ void main() {
       expect(tarjeta.data, '5');
       expect(find.text('Deportes activos'), findsOneWidget);
       expect(find.text('Cupos disponibles'), findsOneWidget);
+      expect(find.text('Asistencia promedio'), findsOneWidget);
     },
   );
 
