@@ -35,7 +35,7 @@ class _FiltrosInteractivosState extends State<_FiltrosInteractivos> {
 }
 
 void main() {
-  testWidgets('ningún filtro usa un check que ensanche los chips', (
+  testWidgets('seleccionar un filtro no mueve los chips horizontal ni verticalmente', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(900, 900);
@@ -59,6 +59,7 @@ void main() {
 
     expect(tester.widget<ChoiceChip>(colectivo).selected, isTrue);
     expect(tester.getSize(colectivo).width, anchoAntes);
+    // También comprueba que la aparición de «Limpiar» no agrande el header.
     expect(tester.getTopLeft(individual), siguienteAntes);
 
     // El mismo chip se puede deseleccionar sin mover a los demás.
