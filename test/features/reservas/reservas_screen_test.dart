@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:saman_deportivo/core/theme/app_theme.dart';
+import 'package:saman_deportivo/features/reservas/presentation/boton_reservas.dart';
 import 'package:saman_deportivo/features/reservas/presentation/crear_reserva_screen.dart';
 import 'package:saman_deportivo/features/reservas/presentation/reservas_screen.dart';
 import 'package:saman_deportivo/models/enums.dart';
@@ -470,6 +471,22 @@ void main() {
 
       expect(find.byKey(const Key('cancelarReserva')), findsNothing);
     });
+  });
+
+  testWidgets('el botón de los tres roles abre las reservas', (tester) async {
+    await _tamano(tester, _celular);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: BotonReservas(rol: Rol.entrenador)),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Reservas de espacios'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reservas de espacios'), findsOneWidget);
+    // En la prueba no hay Firebase: la pantalla lo dice en vez de fallar.
+    expect(find.text('Las reservas no están disponibles por ahora'), findsOneWidget);
   });
 
   testWidgets('sin repositorios ni Firebase muestra un aviso', (tester) async {
