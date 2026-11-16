@@ -416,6 +416,23 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('las tres pestañas caben en el celular y se puede volver', (
+      tester,
+    ) async {
+      await _mostrar(tester, reservas: ReservasFalsas(propias: propias));
+      for (final pestana in ['Espacios', 'Disponibilidad', 'Mis reservas']) {
+        final centro = tester.getCenter(find.widgetWithText(Tab, pestana));
+        expect(centro.dx, inInclusiveRange(0, _celular.width), reason: pestana);
+      }
+
+      await _irA(tester, 'Mis reservas');
+      await _irA(tester, 'Espacios');
+      await _irA(tester, 'Mis reservas');
+
+      expect(find.text('PRÓXIMAS (1)'), findsOneWidget);
+      expect(find.text('No pudimos cargar tus reservas'), findsNothing);
+    });
+
     testWidgets('sin reservas invita a crear una', (tester) async {
       await _mostrar(tester);
       await _irA(tester, 'Mis reservas');

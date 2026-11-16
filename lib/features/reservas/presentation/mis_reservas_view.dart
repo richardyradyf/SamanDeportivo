@@ -28,26 +28,40 @@ import 'package:saman_deportivo/models/reserva_espacio.dart';
 }
 
 /// Pantalla D: reservas del usuario en sesión.
-class MisReservasView extends StatelessWidget {
+class MisReservasView extends StatefulWidget {
   const MisReservasView({
     super.key,
-    required this.reservas,
+    required this.observar,
     required this.espacios,
     required this.reloj,
     required this.onAbrir,
     required this.onNuevaReserva,
   });
 
-  /// Reservas del usuario, en tiempo real.
-  final Stream<List<ReservaEspacio>>? reservas;
+  /// Abre la consulta en tiempo real de las reservas del usuario; null si
+  /// no hay sesión.
+  final Stream<List<ReservaEspacio>> Function()? observar;
   final List<EspacioDeportivo> espacios;
   final DateTime Function() reloj;
   final ValueChanged<ReservaEspacio> onAbrir;
   final VoidCallback onNuevaReserva;
 
   @override
+  State<MisReservasView> createState() => _MisReservasViewState();
+}
+
+class _MisReservasViewState extends State<MisReservasView> {
+  Stream<List<ReservaEspacio>>? _reservas;
+
+  @override
+  void initState() {
+    super.initState();
+    _reservas = widget.observar?.call();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final stream = reservas;
+    final stream = _reservas;
     if (stream == null) {
       return const AvisoReservas(
         icono: Icons.lock_outline,
@@ -70,14 +84,15 @@ class MisReservasView extends StatelessWidget {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final (:proximas, :pasadas) = separarReservas(snapshot.data!, reloj());
+        final ahora = widget.reloj();
+        final (:proximas, :pasadas) = separarReservas(snapshot.data!, ahora);
         if (proximas.isEmpty && pasadas.isEmpty) {
           return AvisoReservas(
             icono: Icons.event_available_outlined,
             titulo: 'Todavía no tienes reservas',
             mensaje: 'Reserva una cancha o el gimnasio y aparecerá aquí.',
             accion: FilledButton(
-              onPressed: onNuevaReserva,
+              onPressed: widget.onNuevaReserva,
               child: const Text('Nueva reserva'),
             ),
           );
@@ -96,18 +111,18 @@ class MisReservasView extends StatelessWidget {
                       titulo: 'Próximas',
                       vacio: 'No tienes reservas próximas.',
                       reservas: proximas,
-                      espacios: espacios,
-                      ahora: reloj(),
-                      onAbrir: onAbrir,
+                      espacios: widget.espacios,
+                      ahora: ahora,
+                      onAbrir: widget.onAbrir,
                     ),
                     const SizedBox(height: 24),
                     _Seccion(
                       titulo: 'Pasadas',
                       vacio: 'Aún no tienes reservas pasadas.',
                       reservas: pasadas,
-                      espacios: espacios,
-                      ahora: reloj(),
-                      onAbrir: onAbrir,
+                      espacios: widget.espacios,
+                      ahora: ahora,
+                      onAbrir: widget.onAbrir,
                     ),
                   ],
                 ),

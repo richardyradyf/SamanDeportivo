@@ -77,7 +77,10 @@ class _ReservasScreenState extends State<ReservasScreen>
 
   Stream<List<EspacioDeportivo>>? _streamEspacios;
   Stream<List<Deporte>>? _streamDeportes;
-  Stream<List<ReservaEspacio>>? _misReservas;
+  /// Abre la consulta de "Mis reservas". Es una función y no un stream
+  /// guardado porque la pestaña se vuelve a construir al regresar a ella, y
+  /// un stream de Firestore no admite dos suscripciones.
+  Stream<List<ReservaEspacio>> Function()? _observarMisReservas;
 
   /// Espacio elegido en Disponibilidad (también al tocar una tarjeta).
   String? _espacioId;
@@ -107,11 +110,13 @@ class _ReservasScreenState extends State<ReservasScreen>
         (conFirebase ? FirebaseAuth.instance.currentUser?.uid : null);
     final reservas = _reservas;
     if (uid != null && reservas != null) {
-      try {
-        _misReservas = reservas.observarPropias(uid);
-      } catch (error) {
-        _misReservas = Stream.error(error);
-      }
+      _observarMisReservas = () {
+        try {
+          return reservas.observarPropias(uid);
+        } catch (error) {
+          return Stream.error(error);
+        }
+      };
     }
   }
 
@@ -216,8 +221,8 @@ class _ReservasScreenState extends State<ReservasScreen>
               ),
               TabBar(
                 controller: _pestanas,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
+                // Pestañas fijas del mismo ancho: las tres se ven siempre,
+                // también en el celular.
                 tabs: const [
                   Tab(text: 'Espacios'),
                   Tab(text: 'Disponibilidad'),
@@ -266,7 +271,7 @@ class _ReservasScreenState extends State<ReservasScreen>
                             ),
                           ),
                           MisReservasView(
-                            reservas: _misReservas,
+                            observar: _observarMisReservas,
                             espacios: espacios,
                             reloj: _ahora,
                             onAbrir: (reserva) => _abrirReserva(reserva, espacios),
