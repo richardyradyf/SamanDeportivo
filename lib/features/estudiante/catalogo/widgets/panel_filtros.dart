@@ -35,11 +35,18 @@ class PanelFiltros extends StatelessWidget {
         Row(
           children: [
             Expanded(child: Text('Filtros', style: tema.textTheme.titleMedium)),
-            if (filtro.cantidadFiltros > 0)
-              TextButton(
+            // Reservar siempre la altura del botón: al seleccionar un filtro,
+            // mostrar «Limpiar» no debe empujar los chips hacia abajo.
+            Visibility(
+              visible: filtro.cantidadFiltros > 0,
+              maintainState: true,
+              maintainAnimation: true,
+              maintainSize: true,
+              child: TextButton(
                 onPressed: () => onCambio(filtro.limpiarFiltros()),
                 child: const Text('Limpiar'),
               ),
+            ),
           ],
         ),
         CheckboxListTile(
@@ -156,6 +163,9 @@ class _Grupo extends StatelessWidget {
                 ChoiceChip(
                   label: Text(opcion.etiqueta),
                   selected: opcion.elegida,
+                  // El check predeterminado cambia el ancho al seleccionar
+                  // y desplaza los demás filtros dentro del Wrap.
+                  showCheckmark: false,
                   onSelected: (_) => opcion.alPulsar(),
                 ),
             ],
