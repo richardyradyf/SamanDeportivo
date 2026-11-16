@@ -64,6 +64,43 @@ void main() {
     expect(() => validar(), returnsNormally);
   });
 
+  test('agenda nueva rechaza una clase que cruza una reserva privada', () {
+    const horarioLunes = HorarioSesion(
+      dia: DiaSemana.lunes,
+      horaInicio: '16:00',
+      horaFin: '18:00',
+      lugar: 'Cancha de tenis 1',
+      espacioId: 'cancha-tenis-1',
+    );
+    // Lunes 16-nov-2026, 16:00-18:00 Caracas = 20:00-22:00 UTC.
+    expect(
+      ValidacionesReserva.reservaCruzaClaseSemanal(
+        inicioReserva: DateTime.utc(2026, 11, 16, 21),
+        finReserva: DateTime.utc(2026, 11, 16, 22),
+        horario: horarioLunes,
+      ),
+      isTrue,
+    );
+    // Una reserva contigua es válida, tanto al terminar como al iniciar.
+    expect(
+      ValidacionesReserva.reservaCruzaClaseSemanal(
+        inicioReserva: DateTime.utc(2026, 11, 16, 22),
+        finReserva: DateTime.utc(2026, 11, 16, 23),
+        horario: horarioLunes,
+      ),
+      isFalse,
+    );
+    // También detecta colisión con una clase de la semana siguiente.
+    expect(
+      ValidacionesReserva.reservaCruzaClaseSemanal(
+        inicioReserva: DateTime.utc(2026, 11, 16, 23),
+        finReserva: DateTime.utc(2026, 11, 23, 21),
+        horario: horarioLunes,
+      ),
+      isTrue,
+    );
+  });
+
   test('estudiante no puede reservar más de dos horas', () {
     expect(
       () => validar(fin: DateTime.utc(2026, 11, 17, 15, 1)),
