@@ -29,8 +29,14 @@ class UsuarioService {
       throw ArgumentError('La cedula no tiene un formato valido');
     }
 
-    if (!RegExp(r'^[a-zA-Z0-9-]{4,24}$').hasMatch(carnet)) {
+    if (!RegExp(r'^[0-9]{4,24}$').hasMatch(carnet)) {
       throw ArgumentError('El carnet no tiene un formato valido');
+    }
+
+    final telefono = estudiante.telefono;
+    if (telefono != null &&
+        !RegExp(r'^\+[1-9][0-9]{7,14}$').hasMatch(telefono)) {
+      throw ArgumentError('El telefono debe incluir el prefijo internacional');
     }
 
     final usuarioRef = _usuarios.doc(estudiante.uid);
@@ -65,6 +71,7 @@ class UsuarioService {
         nombre: usuario.nombre,
         correo: usuario.correo,
         carnet: usuario.carnet ?? '',
+        telefono: usuario.telefono,
         estado: EstadoEstudiante.activo,
       ),
     );
@@ -93,7 +100,7 @@ class UsuarioService {
       throw ArgumentError('Nombre invalido');
     }
 
-    if (!RegExp(r'^[a-zA-Z0-9-]{4,24}$').hasMatch(carnetNuevo)) {
+    if (!RegExp(r'^[0-9]{4,24}$').hasMatch(carnetNuevo)) {
       throw ArgumentError('Carnet invalido');
     }
 

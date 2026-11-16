@@ -5,6 +5,9 @@ import 'persona.dart';
 /// Es el único rol que puede registrarse por sí mismo.
 class Estudiante extends Persona {
   final String carnet;
+  /// Número internacional E.164, por ejemplo +584121234567.
+  /// Opcional para mantener la lectura de perfiles creados antes del Hito 4.
+  final String? telefono;
   final EstadoEstudiante estado;
 
   const Estudiante({
@@ -13,6 +16,7 @@ class Estudiante extends Persona {
     required super.nombre,
     required super.correo,
     required this.carnet,
+    this.telefono,
     this.estado = EstadoEstudiante.activo, // Nace activo.
   });
 
@@ -26,6 +30,7 @@ class Estudiante extends Persona {
     return {
       ...super.toMap(), // cedula, nombre, correo y rol
       'carnet': carnet,
+      if (telefono?.isNotEmpty ?? false) 'telefono': telefono,
       'estado': estado.name,
     };
   }
@@ -37,6 +42,7 @@ class Estudiante extends Persona {
       nombre: datos['nombre'] as String? ?? '',
       correo: datos['correo'] as String? ?? '',
       carnet: datos['carnet'] as String? ?? '',
+      telefono: datos['telefono'] as String?,
       estado: EstadoEstudiante.desdeTexto(datos['estado'] as String?),
     );
   }
@@ -46,6 +52,7 @@ class Estudiante extends Persona {
   Estudiante copyWith({
     String? nombre,
     String? carnet,
+    String? telefono,
     EstadoEstudiante? estado,
   }) {
     return Estudiante(
@@ -54,6 +61,7 @@ class Estudiante extends Persona {
       nombre: nombre ?? this.nombre,
       correo: correo, // El correo lo gestiona Firebase Auth.
       carnet: carnet ?? this.carnet,
+      telefono: telefono ?? this.telefono,
       estado: estado ?? this.estado,
     );
   }

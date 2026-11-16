@@ -9,6 +9,7 @@ void main() {
     'correo': 'alexander@unimet.edu.ve',
     'rol': 'estudiante',
     'carnet': '202611111',
+    'telefono': '+584121234567',
     'estado': 'activo',
   };
 
@@ -17,6 +18,7 @@ void main() {
     expect(perfil.rol, RolPerfil.estudiante);
     expect(perfil.iniciales, 'AR');
     expect(perfil.carnet, '202611111');
+    expect(perfil.telefono, '+584121234567');
   });
 
   test('rechaza rol desconocido sin otorgar privilegios', () {

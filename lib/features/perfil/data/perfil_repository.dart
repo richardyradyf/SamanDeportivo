@@ -9,5 +9,12 @@ abstract class PerfilRepository {
     required String uid,
     required String nombre,
     String? carnet,
+    String? telefono,
   });
+
+  /// Envío de verificación antes de modificar el correo en Firebase Auth.
+  Future<void> solicitarCambioCorreo(String correo);
+
+  /// Actualiza Firestore únicamente si Auth ya confirmó el correo nuevo.
+  Future<String> sincronizarCorreoVerificado(String uid);
 }

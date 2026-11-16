@@ -32,6 +32,7 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
   final _nombreController = TextEditingController();
   final _cedulaController = TextEditingController();
   final _carnetController = TextEditingController();
+  final _telefonoController = TextEditingController();
   final _correoController = TextEditingController();
   final _contrasenaController = TextEditingController();
   final _confirmarController = TextEditingController();
@@ -41,6 +42,7 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
     _nombreController.dispose();
     _cedulaController.dispose();
     _carnetController.dispose();
+    _telefonoController.dispose();
     _correoController.dispose();
     _contrasenaController.dispose();
     _confirmarController.dispose();
@@ -59,6 +61,7 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
       nombre: _nombreController.text.trim(),
       cedula: _cedulaController.text.trim(),
       carnet: _carnetController.text.trim(),
+      telefono: _telefonoController.text.trim(),
       correo: _correoController.text.trim().toLowerCase(),
       contrasena: _contrasenaController.text,
     );
@@ -115,21 +118,25 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
 
     // Validar carnet.
     if (etiqueta == 'Número de carnet') {
-      if (!RegExp(r'^[a-zA-Z0-9-]{4,24}$').hasMatch(texto)) {
-        return 'El carnet debe tener entre 4 y 24 caracteres '
-            'y solo puede contener letras, números o guiones';
+      if (!RegExp(r'^[0-9]{4,24}$').hasMatch(texto)) {
+        return 'El carnet debe tener entre 4 y 24 dígitos y solo números';
       }
+    }
+
+    if (etiqueta == 'Teléfono internacional' &&
+        !RegExp(r'^\+[1-9][0-9]{7,14}$').hasMatch(texto)) {
+      return 'Incluye el prefijo del país (ej. +584121234567)';
     }
 
     // Validar correo institucional.
     if (etiqueta == 'Correo electrónico') {
       final correoValido = RegExp(
-        r'^[A-Za-z0-9._%+-]+@(correo\.unimet\.edu\.ve|unimet\.edu\.ve)$',
+        r'^[A-Za-z0-9._%+-]+@correo\.unimet\.edu\.ve$',
         caseSensitive: false,
       );
 
       if (!correoValido.hasMatch(texto)) {
-        return 'Utiliza un correo institucional UNIMET';
+        return 'Utiliza un correo @correo.unimet.edu.ve';
       }
     }
 
@@ -239,6 +246,18 @@ class _FormularioRegistroState extends State<_FormularioRegistro> {
                   _campo(
                     'Número de carnet',
                     _carnetController,
+                    tipoTeclado: TextInputType.number,
+                    filtros: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+
+                  // Teléfono con código internacional; se guarda en E.164.
+                  _campo(
+                    'Teléfono internacional',
+                    _telefonoController,
+                    tipoTeclado: TextInputType.phone,
+                    filtros: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[+0-9]')),
+                    ],
                   ),
 
                   // Correo institucional.

@@ -9,6 +9,7 @@ class UsuarioModel {
   // Datos específicos del estudiante
   final String? carnet;
   final String? estado;
+  final String? telefono;
 
   // Datos específicos del entrenador
   final String? especialidad;
@@ -22,6 +23,7 @@ class UsuarioModel {
     required this.rol,
     this.carnet,
     this.estado,
+    this.telefono,
     this.especialidad,
     this.aniosExperiencia,
   });
@@ -36,6 +38,7 @@ class UsuarioModel {
       'rol': rol,
       'carnet': carnet,
       'estado': estado,
+      'telefono': telefono,
       'especialidad': especialidad,
       'aniosExperiencia': aniosExperiencia,
     };
@@ -51,6 +54,7 @@ class UsuarioModel {
       rol: datos['rol'] as String,
       carnet: datos['carnet'] as String?,
       estado: datos['estado'] as String?,
+      telefono: datos['telefono'] as String?,
       especialidad: datos['especialidad'] as String?,
       aniosExperiencia: datos['aniosExperiencia'] as int?,
     );
