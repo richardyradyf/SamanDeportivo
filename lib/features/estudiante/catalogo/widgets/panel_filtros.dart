@@ -156,6 +156,9 @@ class _Grupo extends StatelessWidget {
                 ChoiceChip(
                   label: Text(opcion.etiqueta),
                   selected: opcion.elegida,
+                  // El check predeterminado cambia el ancho al seleccionar
+                  // y desplaza los demás filtros dentro del Wrap.
+                  showCheckmark: false,
                   onSelected: (_) => opcion.alPulsar(),
                 ),
             ],
