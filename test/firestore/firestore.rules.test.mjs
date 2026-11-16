@@ -83,6 +83,28 @@ test('administrador puede consultar otros perfiles', async () => {
   await assertSucceeds(getDoc(doc(admin(), 'usuarios', 'uid-b')));
 });
 
+test('H4: solo el administrador registra y modifica instalaciones', async () => {
+  const id = 'cancha-h4-1';
+  const datos = {
+    nombre: 'Cancha de tenis 1', tipo: 'Tenis', descripcion: '', activo: true,
+    creadoEn: serverTimestamp(), actualizadoEn: serverTimestamp(),
+  };
+  await assertFails(setDoc(doc(estudiante(), 'espacios', id), datos));
+  await assertSucceeds(setDoc(doc(admin(), 'espacios', id), datos));
+  await assertSucceeds(getDoc(doc(estudiante(), 'espacios', id)));
+  await assertSucceeds(updateDoc(doc(admin(), 'espacios', id), {
+    nombre: 'Cancha de tenis principal',
+    actualizadoEn: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(doc(admin(), 'espacios', id), {
+    activo: false, actualizadoEn: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(estudiante(), 'espacios', id), {
+    activo: true, actualizadoEn: serverTimestamp(),
+  }));
+  await assertFails(deleteDoc(doc(admin(), 'espacios', id)));
+});
+
 test('usuario anonimo no puede consultar perfiles', async () => {
   const anon = env.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(anon, 'usuarios', 'uid-a')));
