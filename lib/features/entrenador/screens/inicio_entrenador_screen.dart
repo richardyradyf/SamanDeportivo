@@ -4,6 +4,7 @@ import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
+import 'package:saman_deportivo/features/reservas/presentation/boton_reservas.dart';
 import 'package:saman_deportivo/models/enums.dart';
 
 /// Pantalla de inicio del entrenador, según el Figma: Dashboard,
@@ -20,6 +21,7 @@ class InicioEntrenadorScreen extends StatelessWidget {
     this.estudiantes,
     this.asistencia,
     this.historial,
+    this.uid,
   });
 
   final String nombre;
@@ -34,13 +36,17 @@ class InicioEntrenadorScreen extends StatelessWidget {
   final Widget? estudiantes;
   final Widget? asistencia;
   final Widget? historial;
+  final String? uid;
 
   @override
   Widget build(BuildContext context) {
     return LayoutResponsivo(
       titulo: 'Samán',
       subtitulo: Rol.entrenador.etiqueta,
-      acciones: [BotonCerrarSesion(onConfirmar: onCerrarSesion)],
+      acciones: [
+        BotonReservas(rol: Rol.entrenador, usuarioUid: uid),
+        BotonCerrarSesion(onConfirmar: onCerrarSesion),
+      ],
       destinos: [
         DestinoNavegacion(
           etiqueta: 'Dashboard',

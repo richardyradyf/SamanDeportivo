@@ -190,6 +190,7 @@ class _LayoutResponsivoState extends State<LayoutResponsivo> {
           body: Row(
             children: [
               NavigationRail(
+                scrollable: true,
                 selectedIndex: indice,
                 onDestinationSelected: _seleccionar,
                 extended: expandido,
