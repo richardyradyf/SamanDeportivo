@@ -140,8 +140,8 @@ class TarjetaDisciplina extends StatelessWidget {
                 ),
               const SizedBox(height: 12),
               Text(
-                'Cupos: ${deporte.cuposOcupados} de ${deporte.cupoMaximo} '
-                '(${deporte.cuposConfirmados} confirmados)',
+                '${deporte.cuposConfirmados} confirmados · '
+                '${deporte.cuposDisponibles} disponibles de ${deporte.cupoMaximo}',
                 style: texto.bodySmall,
               ),
               const SizedBox(height: 4),

@@ -62,7 +62,7 @@ void main() {
     expect(find.text('Tenis'), findsOneWidget);
     expect(find.text('Voleibol'), findsNothing);
     expect(find.text('Lun · 16:00 - 18:00 · Cancha techada'), findsNWidgets(2));
-    expect(find.text('Cupos: 17 de 20 (15 confirmados)'), findsNWidgets(2));
+    expect(find.text('15 confirmados · 3 disponibles de 20'), findsNWidgets(2));
   });
 
   testWidgets('sin deportes muestra un mensaje', (tester) async {
