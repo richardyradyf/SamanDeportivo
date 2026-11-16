@@ -134,11 +134,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('08/11/2026'), findsOneWidget);
-    expect(find.text('Ausente'), findsOneWidget);
+    final marcador = find.byKey(const Key('asistencia-estado-est-1'));
+    expect(
+      tester.widget<SegmentedButton<EstadoAsistencia>>(marcador).selected,
+      isEmpty,
+    );
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(
+      find.descendant(of: marcador, matching: find.text('Presente')),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Presente'), findsOneWidget);
+    expect(
+      tester.widget<SegmentedButton<EstadoAsistencia>>(marcador).selected,
+      {EstadoAsistencia.presente},
+    );
 
     await tester.tap(find.text('Guardar asistencia'));
     await tester.pumpAndSettle();
@@ -177,6 +186,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Presente'), findsOneWidget);
+    expect(
+      tester.widget<SegmentedButton<EstadoAsistencia>>(
+        find.byKey(const Key('asistencia-estado-est-1')),
+      ).selected,
+      {EstadoAsistencia.presente},
+    );
   });
 }
