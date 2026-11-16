@@ -1006,3 +1006,114 @@ test('Spark P3: control de agenda no admite version repetida', async () => {
   });
   await assertFails(lote.commit());
 });
+
+// H4: reserva privada, proyección pública y control de agenda se escriben
+// en un solo batch. Son pruebas de permisos, no sustituyen las validaciones
+// de solapamientos ejecutadas por la transacción del repositorio Flutter.
+async function prepararEspacioReserva() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'espacios', 'cancha-reserva-h4'), {
+      nombre: 'Cancha reservable H4', tipo: 'Tenis', descripcion: '',
+      activo: true, creadoEn: new Date(), actualizadoEn: new Date(),
+    });
+  });
+}
+
+function fechasReservaH4() {
+  const inicio = new Date(Date.now() + 48 * 60 * 60 * 1000);
+  const fin = new Date(inicio.getTime() + 60 * 60 * 1000);
+  return { inicio, fin };
+}
+
+async function loteReservaH4(id, opciones = {}) {
+  const db = estudiante();
+  const control = await getDoc(doc(db, 'control', 'agenda'));
+  const version = control.exists() ? control.data().version + 1 : 1;
+  const { inicio, fin } = fechasReservaH4();
+  const privada = {
+    espacioId: 'cancha-reserva-h4', usuarioUid: 'uid-a', rol: 'estudiante',
+    inicio, fin, motivo: 'Práctica de tenis', estado: 'activa',
+    creadoEn: serverTimestamp(), actualizadoEn: null,
+    ...opciones.privada,
+  };
+  const publica = {
+    espacioId: privada.espacioId, inicio: privada.inicio, fin: privada.fin,
+    ...opciones.publica,
+  };
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'reservasEspacios', id), privada);
+  lote.set(doc(db, 'ocupacionesEspacios', id), publica);
+  lote.set(doc(db, 'control', 'agenda'), {
+    version, reservaId: id, accion: 'crear',
+    actualizadoEn: serverTimestamp(),
+  });
+  return lote;
+}
+
+test('H4: reserva aislada no puede evitar la proyección pública', async () => {
+  await prepararEspacioReserva();
+  const { inicio, fin } = fechasReservaH4();
+  await assertFails(setDoc(doc(estudiante(), 'reservasEspacios', 'h4-suelta'), {
+    espacioId: 'cancha-reserva-h4', usuarioUid: 'uid-a', rol: 'estudiante',
+    inicio, fin, motivo: 'Práctica de tenis', estado: 'activa',
+    creadoEn: serverTimestamp(), actualizadoEn: null,
+  }));
+});
+
+test('H4: estudiante crea y cancela reserva con tres escrituras atómicas', async () => {
+  await prepararEspacioReserva();
+  const id = 'h4-reserva-atomica';
+  await assertSucceeds((await loteReservaH4(id)).commit());
+
+  const db = estudiante();
+  const privada = await getDoc(doc(db, 'reservasEspacios', id));
+  const publica = await getDoc(doc(db, 'ocupacionesEspacios', id));
+  if (!privada.exists() || !publica.exists()
+      || Object.keys(publica.data()).sort().join(',') !== 'espacioId,fin,inicio') {
+    throw new Error('La proyección pública debe contener solo los horarios.');
+  }
+  const otro = env.authenticatedContext('uid-b', {
+    email: 'dos@unimet.edu.ve',
+  }).firestore();
+  await assertFails(getDoc(doc(otro, 'reservasEspacios', id)));
+  await assertSucceeds(getDoc(doc(otro, 'ocupacionesEspacios', id)));
+  await assertFails(updateDoc(doc(otro, 'reservasEspacios', id), {
+    estado: 'cancelada', actualizadoEn: serverTimestamp(),
+  }));
+
+  const version = (await getDoc(doc(db, 'control', 'agenda'))).data().version;
+  const cancelar = writeBatch(db);
+  cancelar.update(doc(db, 'reservasEspacios', id), {
+    estado: 'cancelada', actualizadoEn: serverTimestamp(),
+  });
+  cancelar.delete(doc(db, 'ocupacionesEspacios', id));
+  cancelar.set(doc(db, 'control', 'agenda'), {
+    version: version + 1, reservaId: id, accion: 'cancelar',
+    actualizadoEn: serverTimestamp(),
+  });
+  await assertSucceeds(cancelar.commit());
+  const final = await getDoc(doc(db, 'reservasEspacios', id));
+  const proyeccion = await getDoc(doc(db, 'ocupacionesEspacios', id));
+  if (final.data().estado !== 'cancelada' || proyeccion.exists()) {
+    throw new Error('La cancelación dejó ocupación o estado inconsistente.');
+  }
+});
+
+test('H4: proyección pública rechaza datos personales', async () => {
+  await prepararEspacioReserva();
+  await assertFails((await loteReservaH4('h4-privacidad', {
+    publica: { usuarioUid: 'uid-a', telefono: '+584120000000' },
+  })).commit());
+});
+
+test('H4: límites de dos horas y tres semanas están protegidos por reglas', async () => {
+  await prepararEspacioReserva();
+  const { inicio } = fechasReservaH4();
+  await assertFails((await loteReservaH4('h4-tres-horas', {
+    privada: { fin: new Date(inicio.getTime() + 3 * 60 * 60 * 1000) },
+  })).commit());
+  const lejano = new Date(Date.now() + 25 * 24 * 60 * 60 * 1000);
+  await assertFails((await loteReservaH4('h4-fuera-plazo', {
+    privada: { inicio: lejano, fin: new Date(lejano.getTime() + 60 * 60 * 1000) },
+  })).commit());
+});

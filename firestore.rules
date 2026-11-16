@@ -576,6 +576,93 @@ service cloud.firestore {
         && getAfter(rutaDeporte(d.codigoDeporte)).data.actualizadoEn == request.time;
     }
 
+    // H4: clases y reservas utilizan el MISMO contador control/agenda.
+    // Los cambios simultáneos de agenda y reservas quedan serializados.
+    function rutaReservaEspacio(id) {
+      return /databases/$(database)/documents/reservasEspacios/$(id);
+    }
+
+    function rutaOcupacionEspacio(id) {
+      return /databases/$(database)/documents/ocupacionesEspacios/$(id);
+    }
+
+    function reservaConControl(id, accion) {
+      let ruta = rutaControlAgenda();
+      return existsAfter(ruta)
+        && getAfter(ruta).data.reservaId == id
+        && getAfter(ruta).data.accion == accion
+        && getAfter(ruta).data.actualizadoEn == request.time
+        && getAfter(ruta).data.version ==
+          (exists(ruta) ? get(ruta).data.version : 0) + 1;
+    }
+
+    function controlReservaValido() {
+      let d = request.resource.data;
+      let r = rutaReservaEspacio(d.reservaId);
+      let o = rutaOcupacionEspacio(d.reservaId);
+      return autenticado()
+        && d.keys().hasAll(['version', 'reservaId', 'accion', 'actualizadoEn'])
+        && d.keys().hasOnly(['version', 'reservaId', 'accion', 'actualizadoEn'])
+        && d.version is int && d.version >= 1
+        && d.reservaId is string && d.reservaId.size() >= 1
+        && d.accion in ['crear', 'cancelar']
+        && d.actualizadoEn == request.time
+        && existsAfter(r)
+        && getAfter(r).data.usuarioUid == request.auth.uid
+        && (
+          (d.accion == 'crear'
+            && !exists(r)
+            && getAfter(r).data.estado == 'activa'
+            && existsAfter(o))
+          || (d.accion == 'cancelar'
+            && exists(r)
+            && get(r).data.estado == 'activa'
+            && getAfter(r).data.estado == 'cancelada'
+            && !existsAfter(o))
+        );
+    }
+
+    function datosReservaNuevaValidos() {
+      let d = request.resource.data;
+      let usuario = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let espacio = /databases/$(database)/documents/espacios/$(d.espacioId);
+      return autenticado()
+        && d.keys().hasAll([
+          'espacioId', 'usuarioUid', 'rol', 'inicio', 'fin', 'motivo',
+          'estado', 'creadoEn', 'actualizadoEn'
+        ])
+        && d.keys().hasOnly([
+          'espacioId', 'usuarioUid', 'rol', 'inicio', 'fin', 'motivo',
+          'estado', 'creadoEn', 'actualizadoEn'
+        ])
+        && d.usuarioUid == request.auth.uid
+        && d.espacioId is string && d.espacioId.size() >= 1
+        && exists(espacio) && get(espacio).data.activo == true
+        && exists(usuario) && d.rol == get(usuario).data.rol
+        && d.rol in ['estudiante', 'entrenador', 'administrador']
+        && d.inicio is timestamp && d.fin is timestamp
+        && d.inicio > request.time && d.fin > d.inicio
+        && (d.rol != 'estudiante' || (
+          d.fin - d.inicio <= duration.value(2, 'h')
+          && d.fin <= request.time + duration.value(21, 'd')
+        ))
+        && d.motivo is string
+        && d.motivo.size() >= 3 && d.motivo.size() <= 200
+        && d.estado == 'activa'
+        && d.creadoEn == request.time
+        && d.actualizadoEn == null;
+    }
+
+    function ocupacionCoincideConReserva(id) {
+      let r = getAfter(rutaReservaEspacio(id)).data;
+      let d = request.resource.data;
+      return d.keys().hasAll(['espacioId', 'inicio', 'fin'])
+        && d.keys().hasOnly(['espacioId', 'inicio', 'fin'])
+        && d.espacioId == r.espacioId
+        && d.inicio == r.inicio
+        && d.fin == r.fin;
+    }
+
     // H3 Andrés — Pagos con PayPal JS SDK (sin Cloud Functions).
     // La app registra el pago capturado en el navegador. Estas reglas
     // obligan a que pago, confirmación y cupo se escriban juntos.
@@ -1115,12 +1202,46 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Proyección pública estrictamente sin datos personales. El cliente
-    // todavía no puede escribir aquí hasta incorporar la transacción de
-    // reservas y la comprobación de getAfter() en el siguiente PR.
+    // Proyección pública sin datos personales: únicamente los tres campos
+    // de disponibilidad; siempre vinculada a una reserva privada y al control.
     match /ocupacionesEspacios/{ocupacionId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if autenticado()
+        && !exists(rutaReservaEspacio(ocupacionId))
+        && existsAfter(rutaReservaEspacio(ocupacionId))
+        && getAfter(rutaReservaEspacio(ocupacionId)).data.usuarioUid == request.auth.uid
+        && ocupacionCoincideConReserva(ocupacionId)
+        && reservaConControl(ocupacionId, 'crear');
+      allow update: if false;
+      allow delete: if autenticado()
+        && exists(rutaReservaEspacio(ocupacionId))
+        && get(rutaReservaEspacio(ocupacionId)).data.usuarioUid == request.auth.uid
+        && getAfter(rutaReservaEspacio(ocupacionId)).data.estado == 'cancelada'
+        && reservaConControl(ocupacionId, 'cancelar');
+    }
+
+    // Propietario lee su motivo y estado; otros solo ven la proyección pública.
+    match /reservasEspacios/{reservaId} {
+      allow get, list: if esAdministrador()
+        || (autenticado() && resource.data.usuarioUid == request.auth.uid);
+      allow create: if datosReservaNuevaValidos()
+        && !exists(rutaOcupacionEspacio(reservaId))
+        && existsAfter(rutaOcupacionEspacio(reservaId))
+        && getAfter(rutaOcupacionEspacio(reservaId)).data.espacioId == request.resource.data.espacioId
+        && getAfter(rutaOcupacionEspacio(reservaId)).data.inicio == request.resource.data.inicio
+        && getAfter(rutaOcupacionEspacio(reservaId)).data.fin == request.resource.data.fin
+        && reservaConControl(reservaId, 'crear');
+      allow update: if autenticado()
+        && resource.data.usuarioUid == request.auth.uid
+        && resource.data.estado == 'activa'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['estado', 'actualizadoEn'])
+        && request.resource.data.estado == 'cancelada'
+        && request.resource.data.actualizadoEn == request.time
+        && exists(rutaOcupacionEspacio(reservaId))
+        && !existsAfter(rutaOcupacionEspacio(reservaId))
+        && reservaConControl(reservaId, 'cancelar');
+      allow delete: if false;
     }
 
     match /deportes/{codigo} {
@@ -1270,12 +1391,17 @@ service cloud.firestore {
 
     // A2 Spark: un unico contador global para serializar agendas.
     match /control/{controlId} {
-      allow get: if controlId in ['agenda', 'resenas'] && esAdministrador();
+      allow get: if (controlId == 'agenda' && autenticado())
+        || (controlId == 'resenas' && esAdministrador());
       allow list: if false;
       allow create: if (
           controlId == 'agenda'
           && esAdministrador()
           && controlAgendaValido()
+          && request.resource.data.version == 1
+        ) || (
+          controlId == 'agenda'
+          && controlReservaValido()
           && request.resource.data.version == 1
         ) || (
           controlId == 'resenas'
@@ -1287,6 +1413,10 @@ service cloud.firestore {
           controlId == 'agenda'
           && esAdministrador()
           && controlAgendaValido()
+          && request.resource.data.version == resource.data.version + 1
+        ) || (
+          controlId == 'agenda'
+          && controlReservaValido()
           && request.resource.data.version == resource.data.version + 1
         ) || (
           controlId == 'resenas'
