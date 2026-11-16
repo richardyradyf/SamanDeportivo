@@ -10,6 +10,8 @@ import 'package:saman_deportivo/features/estudiante/catalogo/widgets/etiqueta_cu
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/formulario_resena.dart';
 import 'package:saman_deportivo/features/estudiante/catalogo/widgets/imagen_deporte.dart';
 import 'package:saman_deportivo/models/deporte.dart';
+import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
 import 'package:saman_deportivo/models/resena.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 import 'package:saman_deportivo/repositories/resena_repository.dart';
@@ -29,6 +31,9 @@ class DetalleDeporteScreen extends StatefulWidget {
     this.estudianteNombre,
     this.puedeResenar = false,
     this.onInscribirse,
+    this.inscripcion,
+    this.onConfirmarPago,
+    this.verificandoInscripcion = false,
   });
 
   /// El deporte elegido en el catálogo. Se muestra mientras llega la
@@ -46,8 +51,18 @@ class DetalleDeporteScreen extends StatefulWidget {
   /// deporte: solo entonces puede calificar (RF-17).
   final bool puedeResenar;
 
-  /// Inscripción (módulo de Mariana). Si es null, el botón queda inactivo.
+  /// Acción de crear o renovar la inscripción; si falta, se deshabilita.
   final void Function(Deporte deporte)? onInscribirse;
+
+  /// Inscripción vigente del estudiante para este deporte, si existe.
+  /// Se actualiza desde el stream que ya escucha InicioEstudianteScreen.
+  final Inscripcion? inscripcion;
+
+  /// Lleva al flujo de pagos existente, sin duplicar la captura de PayPal.
+  final ValueChanged<Inscripcion>? onConfirmarPago;
+
+  /// Evita ofrecer otra inscripción mientras se consulta el estado actual.
+  final bool verificandoInscripcion;
 
   static const double anchoDosColumnas = 840;
 
@@ -133,6 +148,9 @@ class _DetalleDeporteScreenState extends State<DetalleDeporteScreen> {
     final inscripcion = _TarjetaInscripcion(
       deporte: deporte,
       onInscribirse: widget.onInscribirse,
+      inscripcion: widget.inscripcion,
+      onConfirmarPago: widget.onConfirmarPago,
+      verificandoInscripcion: widget.verificandoInscripcion,
     );
     final espacio = SizedBox(height: ancho ? 32 : 20, width: 24);
 
@@ -339,17 +357,57 @@ class _Campo extends StatelessWidget {
 
 /// Cupos ocupados con su barra y el botón de inscripción.
 class _TarjetaInscripcion extends StatelessWidget {
-  const _TarjetaInscripcion({required this.deporte, this.onInscribirse});
+  const _TarjetaInscripcion({
+    required this.deporte,
+    this.onInscribirse,
+    this.inscripcion,
+    this.onConfirmarPago,
+    required this.verificandoInscripcion,
+  });
 
   final Deporte deporte;
   final void Function(Deporte deporte)? onInscribirse;
+  final Inscripcion? inscripcion;
+  final ValueChanged<Inscripcion>? onConfirmarPago;
+  final bool verificandoInscripcion;
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     final maximo = deporte.cupoMaximo;
     final ocupados = deporte.cuposOcupados.clamp(0, maximo);
-    final inscribirse = onInscribirse;
+    final estaConfirmada = inscripcion?.estado == EstadoInscripcion.confirmada;
+    final estaPendiente = inscripcion?.estado == EstadoInscripcion.pendiente;
+    final vencida = estaPendiente && inscripcion!.estaVencida();
+    final porPagar = estaPendiente && !vencida;
+
+    // El estado de la inscripción tiene prioridad sobre los cupos: incluso
+    // si el deporte está lleno, quien ya reservó un cupo debe poder pagarlo.
+    final String textoBoton;
+    final VoidCallback? accion;
+    if (verificandoInscripcion) {
+      textoBoton = 'Verificando inscripción...';
+      accion = null;
+    } else if (estaConfirmada) {
+      textoBoton = 'Ya estás inscrito!';
+      accion = null;
+    } else if (porPagar) {
+      textoBoton = 'Confirmar Pago';
+      accion = onConfirmarPago == null
+          ? null
+          : () => onConfirmarPago!(inscripcion!);
+    } else if (vencida) {
+      // La transacción de reinscripción libera primero el cupo vencido del
+      // mismo estudiante; por eso no depende de deporte.tieneCupo.
+      textoBoton = 'Renovar inscripción';
+      accion = onInscribirse == null ? null : () => onInscribirse!(deporte);
+    } else if (!deporte.tieneCupo) {
+      textoBoton = 'Sin cupos';
+      accion = null;
+    } else {
+      textoBoton = 'Inscribirme';
+      accion = onInscribirse == null ? null : () => onInscribirse!(deporte);
+    }
 
     return Card(
       child: Padding(
@@ -375,11 +433,21 @@ class _TarjetaInscripcion extends StatelessWidget {
             const SizedBox(height: 12),
             EtiquetaCupos(deporte: deporte),
             const SizedBox(height: 20),
-            FilledButton(
-              onPressed: deporte.tieneCupo && inscribirse != null
-                  ? () => inscribirse(deporte)
-                  : null,
-              child: Text(deporte.tieneCupo ? 'Inscribirme' : 'Sin cupos'),
+            if (porPagar && !verificandoInscripcion) ...[
+              const Text('Tu inscripción está pendiente de pago.'),
+              const SizedBox(height: 12),
+            ] else if (vencida && !verificandoInscripcion) ...[
+              const Text(
+                'El plazo para pagar venció. Puedes renovar tu inscripción.',
+              ),
+              const SizedBox(height: 12),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: accion,
+                child: Text(textoBoton),
+              ),
             ),
           ],
         ),
