@@ -16,6 +16,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Registro de estudiante'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNWidgets(6));
+    expect(find.byType(TextFormField), findsNWidgets(7));
   });
 }
