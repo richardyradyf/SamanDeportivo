@@ -14,6 +14,7 @@ Deporte deporte(
   int confirmados = 0,
   bool activo = true,
   List<HorarioSesion> horarios = const [],
+  DateTime? creadoEn,
 }) {
   return Deporte(
     codigo: codigo,
@@ -22,10 +23,10 @@ Deporte deporte(
     disciplina: Disciplina.colectivo,
     costo: 10,
     cupoMaximo: 20,
-    creadoEn: DateTime(2026, 10, 1),
     cuposConfirmados: confirmados,
     activo: activo,
     horarios: horarios,
+    creadoEn: creadoEn ?? DateTime(2026, 1, 1),
     entrenadorUid: 'ent1',
   );
 }
@@ -33,12 +34,17 @@ Deporte deporte(
 HorarioSesion sesion(DiaSemana dia, String inicio, String fin) =>
     HorarioSesion(dia: dia, horaInicio: inicio, horaFin: fin, lugar: 'Cancha');
 
-Asistencia registro(DateTime fecha, EstadoAsistencia estado, String uid) {
+Asistencia registro(
+  DateTime fecha,
+  EstadoAsistencia estado,
+  String uid, {
+  String deporte = 'FUT-01',
+}) {
   return Asistencia.registrar(
-    inscripcionId: '${uid}_FUT-01',
+    inscripcionId: '${uid}_$deporte',
     estudianteUid: uid,
     estudianteNombre: uid,
-    deporteId: 'FUT-01',
+    deporteId: deporte,
     entrenadorUid: 'ent1',
     fecha: fecha,
     estado: estado,
@@ -78,28 +84,76 @@ void main() {
     expect(r.sesionesPorSemana, 3);
   });
 
-  test('el porcentaje usa solo los últimos 30 días', () {
+  test('el porcentaje usa los últimos 3 meses', () {
+    // Hace 3 meses desde el 16/11 es el 16/08.
     final r = ResumenEntrenador.calcular(
       deportes: [futbol],
       asistencias: [
         registro(DateTime(2026, 11, 9), EstadoAsistencia.presente, 'a'),
-        registro(DateTime(2026, 11, 9), EstadoAsistencia.presente, 'b'),
-        registro(DateTime(2026, 11, 2), EstadoAsistencia.presente, 'a'),
         registro(DateTime(2026, 11, 2), EstadoAsistencia.ausente, 'b'),
-        registro(DateTime(2026, 10, 1), EstadoAsistencia.ausente, 'a'),
+        registro(DateTime(2026, 9, 1), EstadoAsistencia.presente, 'a'),
+        // Antes del 16/08: se ignora.
+        registro(DateTime(2026, 8, 10), EstadoAsistencia.ausente, 'a'),
       ],
       ahora: ahora,
     );
-    expect(r.porcentajeAsistencia, 75);
+    expect(r.porcentajeAsistencia, 67); // 2 de 3
   });
 
-  test('sin registros el porcentaje es null, no 0', () {
+  test('no cuenta registros anteriores a la creación del deporte', () {
+    final nuevo = deporte('BAL-01', creadoEn: DateTime(2026, 11, 1));
+    final r = ResumenEntrenador.calcular(
+      deportes: [nuevo],
+      asistencias: [
+        registro(
+          DateTime(2026, 11, 9),
+          EstadoAsistencia.presente,
+          'a',
+          deporte: 'BAL-01',
+        ),
+        // Antes de que existiera el deporte: se ignora.
+        registro(
+          DateTime(2026, 10, 20),
+          EstadoAsistencia.ausente,
+          'a',
+          deporte: 'BAL-01',
+        ),
+      ],
+      ahora: ahora,
+    );
+    expect(r.porcentajeAsistencia, 100);
+  });
+
+  test('ignora registros de deportes que no son suyos o están inactivos', () {
+    final r = ResumenEntrenador.calcular(
+      deportes: [futbol, inactivo],
+      asistencias: [
+        registro(DateTime(2026, 11, 9), EstadoAsistencia.presente, 'a'),
+        registro(
+          DateTime(2026, 11, 9),
+          EstadoAsistencia.ausente,
+          'a',
+          deporte: 'VOL-01',
+        ),
+        registro(
+          DateTime(2026, 11, 9),
+          EstadoAsistencia.ausente,
+          'a',
+          deporte: 'NAT-99',
+        ),
+      ],
+      ahora: ahora,
+    );
+    expect(r.porcentajeAsistencia, 100);
+  });
+
+  test('sin registros el porcentaje es 0', () {
     final r = ResumenEntrenador.calcular(
       deportes: [futbol],
       asistencias: const [],
       ahora: ahora,
     );
-    expect(r.porcentajeAsistencia, isNull);
+    expect(r.porcentajeAsistencia, 0);
   });
 
   test('la próxima sesión ignora los deportes inactivos', () {
