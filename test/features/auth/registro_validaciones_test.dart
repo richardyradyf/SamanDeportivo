@@ -18,13 +18,15 @@ void main() {
     String nombre = 'Mariana Perez',
     String cedula = '12345678',
     String carnet = '20260001',
-    String correo = 'estudiante@unimet.edu.ve',
+    String correo = 'estudiante@correo.unimet.edu.ve',
+    String telefono = '+584121234567',
     String contrasena = 'Clave123',
   }) {
     return controller.validarDatos(
       nombre: nombre,
       cedula: cedula,
       carnet: carnet,
+      telefono: telefono,
       correo: correo,
       contrasena: contrasena,
     );
@@ -56,26 +58,26 @@ void main() {
     test('Rechaza carnet demasiado corto', () {
       expect(
         validar(carnet: '123'),
-        contains('entre 4 y 24 caracteres'),
+        contains('entre 4 y 24 dígitos'),
       );
     });
 
     test('Rechaza carnet demasiado largo', () {
       expect(
         validar(carnet: '1234567890123456789012345'),
-        contains('entre 4 y 24 caracteres'),
+        contains('entre 4 y 24 dígitos'),
       );
     });
 
     test('Rechaza caracteres especiales en el carnet', () {
       expect(
         validar(carnet: '2026/001'),
-        contains('letras, números o guiones'),
+        contains('solo números'),
       );
     });
 
-    test('Acepta carnet con letras y guiones', () {
-      expect(validar(carnet: 'UNI-2026'), isNull);
+    test('Rechaza carnet con letras y guiones', () {
+      expect(validar(carnet: 'UNI-2026'), contains('solo números'));
     });
 
     test('Rechaza nombre de más de 100 caracteres', () {
@@ -87,9 +89,18 @@ void main() {
 
     test('Acepta correo institucional en mayúsculas', () {
       expect(
-        validar(correo: 'ESTUDIANTE@UNIMET.EDU.VE'),
+        validar(correo: 'ESTUDIANTE@CORREO.UNIMET.EDU.VE'),
         isNull,
       );
+    });
+
+    test('Rechaza el dominio institucional antiguo', () {
+      expect(validar(correo: 'estudiante@unimet.edu.ve'), contains('@correo.unimet.edu.ve'));
+    });
+
+    test('Requiere teléfono internacional E.164', () {
+      expect(validar(telefono: '04121234567'), contains('prefijo internacional'));
+      expect(validar(telefono: '+584121234567'), isNull);
     });
   });
 }

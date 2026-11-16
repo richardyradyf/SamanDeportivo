@@ -19,6 +19,7 @@ class _EstudiantesFake implements EstudiantesAdminRepository {
       cedula: '21000001',
       carnet: '20230001',
       correo: 'ana@unimet.edu.ve',
+      telefono: '+584121234567',
       nombre: 'Ana Pérez',
     ),
     const Estudiante(
@@ -119,6 +120,7 @@ void main() {
 
     expect(find.text('Ana Pérez'), findsOneWidget);
     expect(find.text('Luis Gómez'), findsOneWidget);
+    expect(find.text('+584121234567'), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('buscar-estudiante-admin')),
       'perez',

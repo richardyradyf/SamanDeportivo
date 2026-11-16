@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:saman_deportivo/core/theme/app_colors.dart';
 import 'package:saman_deportivo/core/theme/app_theme.dart';
 
@@ -33,16 +34,18 @@ class _PerfilScreenState extends State<PerfilScreen> {
   Future<void> _editar(PerfilUsuario perfil) async {
     final nombre = TextEditingController(text: perfil.nombre);
     final carnet = TextEditingController(text: perfil.carnet ?? '');
+    final telefono = TextEditingController(text: perfil.telefono ?? '');
     final formKey = GlobalKey<FormState>();
-    final cambio = await showDialog<({String nombre, String? carnet})>(
+    final cambio = await showDialog<({String nombre, String? carnet, String? telefono})>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Editar mi perfil'),
-        content: Form(
-          key: formKey,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 410),
-            child: Column(
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 410),
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
@@ -59,13 +62,33 @@ class _PerfilScreenState extends State<PerfilScreen> {
                     controller: carnet,
                     decoration: const InputDecoration(labelText: 'Carnet'),
                     maxLength: 24,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     validator: (s) =>
                         s == null ||
-                            !RegExp(r'^[a-zA-Z0-9-]{4,24}$').hasMatch(s.trim())
-                        ? 'Usa 4–24 letras, números o guiones'
+                            !RegExp(r'^[0-9]{4,24}$').hasMatch(s.trim())
+                        ? 'El carnet debe tener 4–24 dígitos numéricos'
+                        : null,
+                  ),
+                if (perfil.rol == RolPerfil.estudiante)
+                  TextFormField(
+                    controller: telefono,
+                    decoration: const InputDecoration(
+                      labelText: 'Teléfono internacional',
+                      hintText: '+584121234567',
+                    ),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[+0-9]')),
+                    ],
+                    validator: (s) =>
+                        !RegExp(r'^\+[1-9][0-9]{7,14}$')
+                            .hasMatch(s?.trim() ?? '')
+                        ? 'Incluye prefijo internacional, por ejemplo +58'
                         : null,
                   ),
               ],
+              ),
             ),
           ),
         ),
@@ -82,6 +105,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   carnet: perfil.rol == RolPerfil.estudiante
                       ? carnet.text.trim()
                       : null,
+                  telefono: perfil.rol == RolPerfil.estudiante
+                      ? telefono.text.trim()
+                      : null,
                 ));
               }
             },
@@ -95,6 +121,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       nombre.dispose();
       carnet.dispose();
+      telefono.dispose();
     });
     if (!mounted || cambio == null) return;
     setState(() => _procesando = true);
@@ -103,10 +130,99 @@ class _PerfilScreenState extends State<PerfilScreen> {
         uid: perfil.uid,
         nombre: cambio.nombre,
         carnet: cambio.carnet,
+        telefono: cambio.telefono,
       );
       if (mounted) _mensaje('Perfil actualizado correctamente');
     } catch (error) {
       if (mounted) _mensaje('No se pudieron guardar los cambios: $error');
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  Future<void> _cambiarCorreo(PerfilUsuario perfil) async {
+    final correo = TextEditingController(text: perfil.correo);
+    final formKey = GlobalKey<FormState>();
+    final nuevo = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cambiar correo institucional'),
+        content: Form(
+          key: formKey,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 410),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Te enviaremos un enlace al nuevo correo. Después de '
+                  'verificarlo, regresa a tu perfil y pulsa Sincronizar correo.',
+                ),
+                TextFormField(
+                  controller: correo,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Nuevo correo'),
+                  validator: (valor) => RegExp(
+                    r'^[A-Za-z0-9._%+-]+@correo\.unimet\.edu\.ve$',
+                    caseSensitive: false,
+                  ).hasMatch(valor?.trim() ?? '')
+                      ? null
+                      : 'Debe terminar en @correo.unimet.edu.ve',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, correo.text.trim().toLowerCase());
+              }
+            },
+            child: const Text('Enviar verificación'),
+          ),
+        ],
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => correo.dispose());
+    if (!mounted || nuevo == null || nuevo == perfil.correo.toLowerCase()) {
+      return;
+    }
+    setState(() => _procesando = true);
+    try {
+      await widget.repository.solicitarCambioCorreo(nuevo);
+      if (mounted) {
+        _mensaje('Revisa $nuevo. Verifica el enlace y luego sincroniza el correo.');
+      }
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        _mensaje(error.code == 'requires-recent-login'
+            ? 'Por seguridad, cierra sesión y vuelve a entrar antes de cambiar el correo.'
+            : 'No se pudo enviar la verificación: ${error.message ?? error.code}');
+      }
+    } catch (error) {
+      if (mounted) _mensaje('No se pudo solicitar el cambio: $error');
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  Future<void> _sincronizarCorreo(PerfilUsuario perfil) async {
+    setState(() => _procesando = true);
+    try {
+      final correo = await widget.repository.sincronizarCorreoVerificado(perfil.uid);
+      if (mounted) {
+        _mensaje(correo == perfil.correo.toLowerCase()
+            ? 'Aún no se detecta un correo nuevo verificado.'
+            : 'Correo actualizado a $correo');
+      }
+    } catch (error) {
+      if (mounted) _mensaje('No se pudo sincronizar el correo: $error');
     } finally {
       if (mounted) setState(() => _procesando = false);
     }
@@ -266,6 +382,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
                       _Dato('Nombre', perfil.nombre),
                       _Dato('Correo', perfil.correo),
                       _Dato('Cédula', perfil.cedula),
+                      if (perfil.rol == RolPerfil.estudiante)
+                        _Dato('Teléfono', perfil.telefono ?? 'No registrado'),
                     ]),
                     const SizedBox(height: 30),
                     if (perfil.rol == RolPerfil.estudiante)
@@ -312,6 +430,17 @@ class _PerfilScreenState extends State<PerfilScreen> {
           icon: const Icon(Icons.edit_outlined, size: 18),
           label: const Text('Editar perfil'),
         ),
+        if (perfil.rol == RolPerfil.estudiante) ...[
+          OutlinedButton.icon(
+            onPressed: _procesando ? null : () => _cambiarCorreo(perfil),
+            icon: const Icon(Icons.mark_email_unread_outlined, size: 18),
+            label: const Text('Cambiar correo'),
+          ),
+          TextButton(
+            onPressed: _procesando ? null : () => _sincronizarCorreo(perfil),
+            child: const Text('Sincronizar correo'),
+          ),
+        ],
         TextButton.icon(
           onPressed: _procesando ? null : _salir,
           icon: const Icon(Icons.logout, size: 18),

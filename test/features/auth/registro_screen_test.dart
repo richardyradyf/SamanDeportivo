@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:saman_deportivo/features/auth/screens/registro_screen.dart';
 
 void main() {
-  // PRUEBA 1: Verificar que aparecen los seis campos.
+  // PRUEBA 1: Verificar que aparecen los siete campos.
   testWidgets(
     'El registro muestra los campos del formulario',
     (WidgetTester tester) async {
@@ -21,7 +21,7 @@ void main() {
 
       expect(
         find.byType(TextFormField),
-        findsNWidgets(6),
+        findsNWidgets(7),
       );
 
       expect(
@@ -51,7 +51,7 @@ void main() {
 
       expect(
         find.text('Este campo es obligatorio'),
-        findsNWidgets(6),
+        findsNWidgets(7),
       );
     },
   );
@@ -71,12 +71,10 @@ void main() {
       await tester.enterText(campos.at(0), 'Mariana Perez');
       await tester.enterText(campos.at(1), '12345678');
       await tester.enterText(campos.at(2), '20260001');
-      await tester.enterText(
-        campos.at(3),
-        'usuario@gmail.com',
-      );
-      await tester.enterText(campos.at(4), 'Clave123');
+      await tester.enterText(campos.at(3), '+584121234567');
+      await tester.enterText(campos.at(4), 'usuario@gmail.com');
       await tester.enterText(campos.at(5), 'Clave123');
+      await tester.enterText(campos.at(6), 'Clave123');
 
       final boton = find.text('Registrarme');
 
@@ -87,7 +85,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Utiliza un correo institucional UNIMET'),
+        find.text('Utiliza un correo @correo.unimet.edu.ve'),
         findsOneWidget,
       );
     },
@@ -108,12 +106,10 @@ void main() {
       await tester.enterText(campos.at(0), 'Mariana Perez');
       await tester.enterText(campos.at(1), '12345678');
       await tester.enterText(campos.at(2), '20260001');
-      await tester.enterText(
-        campos.at(3),
-        'estudiante@unimet.edu.ve',
-      );
-      await tester.enterText(campos.at(4), 'Clave123');
-      await tester.enterText(campos.at(5), 'OtraClave123');
+      await tester.enterText(campos.at(3), '+584121234567');
+      await tester.enterText(campos.at(4), 'estudiante@correo.unimet.edu.ve');
+      await tester.enterText(campos.at(5), 'Clave123');
+      await tester.enterText(campos.at(6), 'OtraClave123');
 
       final boton = find.text('Registrarme');
 
@@ -148,12 +144,13 @@ void main() {
 
       // Dejamos vacío el campo de carnet (posición 2).
       await tester.enterText(
-        campos.at(3),
-        'estudiante@unimet.edu.ve',
+        campos.at(4),
+        'estudiante@correo.unimet.edu.ve',
       );
 
-      await tester.enterText(campos.at(4), 'Clave123');
+      await tester.enterText(campos.at(3), '+584121234567');
       await tester.enterText(campos.at(5), 'Clave123');
+      await tester.enterText(campos.at(6), 'Clave123');
 
       final boton = find.text('Registrarme');
 
@@ -169,4 +166,14 @@ void main() {
       );
     },
   );
+
+  testWidgets('valida teléfono con prefijo internacional', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: RegistroScreen()));
+    final campos = find.byType(TextFormField);
+    await tester.enterText(campos.at(3), '04121234567');
+    await tester.ensureVisible(find.text('Registrarme'));
+    await tester.tap(find.text('Registrarme'));
+    await tester.pumpAndSettle();
+    expect(find.text('Incluye el prefijo del país (ej. +584121234567)'), findsOneWidget);
+  });
 }

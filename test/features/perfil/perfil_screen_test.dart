@@ -13,6 +13,8 @@ class RepositorioFalso implements PerfilRepository {
   PerfilUsuario perfil;
   String? nombreGuardado;
   String? carnetGuardado;
+  String? telefonoGuardado;
+  String? cambioCorreoSolicitado;
 
   @override
   Stream<PerfilUsuario?> observarPerfil(String uid) => Stream.value(perfil);
@@ -22,10 +24,21 @@ class RepositorioFalso implements PerfilRepository {
     required String uid,
     required String nombre,
     String? carnet,
+    String? telefono,
   }) async {
     nombreGuardado = nombre;
     carnetGuardado = carnet;
+    telefonoGuardado = telefono;
   }
+
+  @override
+  Future<void> solicitarCambioCorreo(String correo) async {
+    cambioCorreoSolicitado = correo;
+  }
+
+  @override
+  Future<String> sincronizarCorreoVerificado(String uid) async =>
+      'alexander.nuevo@correo.unimet.edu.ve';
 }
 
 void main() {
@@ -35,6 +48,7 @@ void main() {
     'correo': 'alexander@unimet.edu.ve',
     'rol': 'estudiante',
     'carnet': '202611111',
+    'telefono': '+584121234567',
     'estado': 'activo',
   });
 
@@ -56,6 +70,7 @@ void main() {
     expect(find.text('Alexander Ramírez'), findsWidgets);
     expect(find.text('202611111'), findsOneWidget);
     expect(find.text('12345678'), findsOneWidget);
+    expect(find.text('+584121234567'), findsOneWidget);
   });
 
   testWidgets('guardar edicion invoca repositorio', (tester) async {
@@ -83,6 +98,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(repo.nombreGuardado, 'Nombre Actualizado');
     expect(repo.carnetGuardado, '202611111');
+    expect(repo.telefonoGuardado, '+584121234567');
+  });
+
+  testWidgets('edita telefono, cédula no editable', (tester) async {
+    final repo = RepositorioFalso(perfil);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.claro,
+      home: Scaffold(body: PerfilScreen(
+        uid: 'uid-demo', repository: repo, cerrarSesion: () async {},
+      )),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Editar perfil'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextFormField, 'Cédula'), findsNothing);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Teléfono internacional'),
+      '+573001234567',
+    );
+    await tester.tap(find.text('Guardar cambios'));
+    await tester.pumpAndSettle();
+    expect(repo.telefonoGuardado, '+573001234567');
+  });
+
+  testWidgets('el cambio de correo solicita verificación', (tester) async {
+    final repo = RepositorioFalso(perfil);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.claro,
+      home: Scaffold(body: PerfilScreen(
+        uid: 'uid-demo', repository: repo, cerrarSesion: () async {},
+      )),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cambiar correo'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Nuevo correo'),
+        'nuevo@correo.unimet.edu.ve');
+    await tester.tap(find.text('Enviar verificación'));
+    await tester.pumpAndSettle();
+    expect(repo.cambioCorreoSolicitado, 'nuevo@correo.unimet.edu.ve');
   });
 
   testWidgets('cerrar sesion exige confirmacion', (tester) async {

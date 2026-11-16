@@ -32,6 +32,13 @@ service cloud.firestore {
         ).data.uid == uid;
     }
 
+    // Perfiles antiguos pueden no tener telefono; si existe, siempre es E.164.
+    function telefonoValido(d) {
+      return !('telefono' in d)
+        || (d.telefono is string
+          && d.telefono.matches('^[+][1-9][0-9]{7,14}$'));
+    }
+
     function nuevoEstudianteValido(uid) {
       let d = request.resource.data;
 
@@ -40,7 +47,7 @@ service cloud.firestore {
           'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
         ])
         && d.keys().hasOnly([
-          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
+          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado', 'telefono'
         ])
         && d.rol == 'estudiante'
         && d.estado == 'activo'
@@ -49,10 +56,12 @@ service cloud.firestore {
         && d.nombre.size() <= 100
         && d.correo is string
         && d.correo == request.auth.token.email
+        && d.correo.matches('^[A-Za-z0-9._%+-]+@correo[.]unimet[.]edu[.]ve$')
         && d.cedula is string
         && d.cedula.matches('^[0-9]{5,20}$')
         && d.carnet is string
-        && d.carnet.matches('^[a-zA-Z0-9-]{4,24}$')
+        && d.carnet.matches('^[0-9]{4,24}$')
+        && telefonoValido(d)
         && indicesEstudianteValidos(uid, d.cedula, d.carnet);
     }
 
@@ -97,7 +106,7 @@ service cloud.firestore {
         ]
         && cambiados.hasOnly(
           resource.data.rol == 'estudiante'
-            ? ['nombre', 'carnet']
+            ? ['nombre', 'carnet', 'telefono', 'correo']
             : ['nombre']
         )
         && request.resource.data.nombre is string
@@ -107,12 +116,23 @@ service cloud.firestore {
           resource.data.rol != 'estudiante'
           || (
             request.resource.data.carnet is string
-            && request.resource.data.carnet.matches(
-              '^[a-zA-Z0-9-]{4,24}$'
+            && telefonoValido(request.resource.data)
+            && (
+              !cambiados.hasAny(['correo'])
+              || (
+                request.resource.data.correo is string
+                && request.resource.data.correo == request.auth.token.email
+                && request.resource.data.correo.matches(
+                  '^[A-Za-z0-9._%+-]+@correo[.]unimet[.]edu[.]ve$'
+                )
+              )
             )
             && (
               request.resource.data.carnet == resource.data.carnet
-              || cambioCarnetValido()
+              || (
+                request.resource.data.carnet.matches('^[0-9]{4,24}$')
+                && cambioCarnetValido()
+              )
             )
           )
         );
@@ -191,7 +211,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.keys().hasAll(['uid'])
         && request.resource.data.uid == request.auth.uid
-        && carnet.matches('^[a-zA-Z0-9-]{4,24}$')
+        && carnet.matches('^[0-9]{4,24}$')
         && getAfter(
           /databases/$(database)/documents/usuarios/$(request.auth.uid)
         ).data.rol == 'estudiante'
