@@ -617,6 +617,7 @@ service cloud.firestore {
           || (d.accion == 'cancelar'
             && exists(r)
             && get(r).data.estado == 'activa'
+            && request.time < get(r).data.inicio
             && getAfter(r).data.estado == 'cancelada'
             && !existsAfter(o))
         );
@@ -1216,6 +1217,7 @@ service cloud.firestore {
       allow delete: if autenticado()
         && exists(rutaReservaEspacio(ocupacionId))
         && get(rutaReservaEspacio(ocupacionId)).data.usuarioUid == request.auth.uid
+        && request.time < get(rutaReservaEspacio(ocupacionId)).data.inicio
         && getAfter(rutaReservaEspacio(ocupacionId)).data.estado == 'cancelada'
         && reservaConControl(ocupacionId, 'cancelar');
     }
@@ -1234,6 +1236,7 @@ service cloud.firestore {
       allow update: if autenticado()
         && resource.data.usuarioUid == request.auth.uid
         && resource.data.estado == 'activa'
+        && request.time < resource.data.inicio
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['estado', 'actualizadoEn'])
         && request.resource.data.estado == 'cancelada'

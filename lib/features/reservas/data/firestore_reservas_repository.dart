@@ -35,7 +35,9 @@ class FirestoreReservasRepository implements ReservasRepository {
   String _usuarioActual() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
-      throw const ReservaEspacioException('Debes iniciar sesión para reservar.');
+      throw const ReservaEspacioException(
+        'Debes iniciar sesión para reservar.',
+      );
     }
     return uid;
   }
@@ -52,18 +54,19 @@ class FirestoreReservasRepository implements ReservasRepository {
   @override
   Stream<List<ReservaEspacio>> observarPropias(String usuarioUid) {
     if (_usuarioActual() != usuarioUid) {
-      throw const ReservaEspacioException('Solo puedes consultar tus reservas.');
+      throw const ReservaEspacioException(
+        'Solo puedes consultar tus reservas.',
+      );
     }
-    return _reservas
-        .where('usuarioUid', isEqualTo: usuarioUid)
-        .snapshots()
-        .map((s) {
-          final lista = s.docs
-              .map((d) => ReservaEspacio.fromMap(d.id, d.data()))
-              .toList(growable: false);
-          lista.sort((a, b) => a.inicio.compareTo(b.inicio));
-          return lista;
-        });
+    return _reservas.where('usuarioUid', isEqualTo: usuarioUid).snapshots().map(
+      (s) {
+        final lista = s.docs
+            .map((d) => ReservaEspacio.fromMap(d.id, d.data()))
+            .toList(growable: false);
+        lista.sort((a, b) => a.inicio.compareTo(b.inicio));
+        return lista;
+      },
+    );
   }
 
   @override
@@ -74,9 +77,10 @@ class FirestoreReservasRepository implements ReservasRepository {
     required String motivo,
   }) async {
     final uid = _usuarioActual();
-    final perfil = await _db.collection('usuarios').doc(uid).get(
-      const GetOptions(source: Source.server),
-    );
+    final perfil = await _db
+        .collection('usuarios')
+        .doc(uid)
+        .get(const GetOptions(source: Source.server));
     final datosPerfil = perfil.data();
     if (datosPerfil == null) {
       throw const ReservaEspacioException('Tu perfil no está disponible.');
@@ -90,9 +94,9 @@ class FirestoreReservasRepository implements ReservasRepository {
       const GetOptions(source: Source.server),
     );
     final versionEsperada = _version(controlPrevio.data());
-    final catalogo = await _db.collection('deportes').get(
-      const GetOptions(source: Source.server),
-    );
+    final catalogo = await _db
+        .collection('deportes')
+        .get(const GetOptions(source: Source.server));
     final ocupacionesPrevias = await _ocupaciones
         .where('espacioId', isEqualTo: espacioId)
         .where('inicio', isLessThan: Timestamp.fromDate(fin))
@@ -192,6 +196,14 @@ class FirestoreReservasRepository implements ReservasRepository {
       if (datos['estado'] != EstadoReservaEspacio.activa.name) {
         throw const ReservaEspacioException('La reserva ya fue cancelada.');
       }
+      final inicio = datos['inicio'];
+
+      if (inicio is! Timestamp || !DateTime.now().isBefore(inicio.toDate())) {
+        throw const ReservaEspacioException(
+          'Solo puedes cancelar una reserva antes de que comience.',
+        );
+      }
+
       final ocupacion = await tx.get(publica);
       if (!ocupacion.exists) {
         throw const ReservaEspacioException(
