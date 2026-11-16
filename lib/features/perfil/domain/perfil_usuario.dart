@@ -10,6 +10,7 @@ class PerfilUsuario {
     required this.correo,
     required this.rol,
     this.carnet,
+    this.telefono,
     this.estado,
     this.especialidad,
     this.aniosExperiencia,
@@ -21,6 +22,7 @@ class PerfilUsuario {
   final String correo;
   final RolPerfil rol;
   final String? carnet;
+  final String? telefono;
   final String? estado;
   final String? especialidad;
   final int? aniosExperiencia;
@@ -58,6 +60,7 @@ class PerfilUsuario {
       correo: obligatorio('correo'),
       rol: rol,
       carnet: opcional('carnet'),
+      telefono: opcional('telefono'),
       estado: opcional('estado'),
       especialidad: opcional('especialidad'),
       aniosExperiencia: datos['aniosExperiencia'] is int

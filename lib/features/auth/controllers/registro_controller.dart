@@ -19,6 +19,7 @@ class RegistroController extends ChangeNotifier {
     required String nombre,
     required String cedula,
     required String carnet,
+    required String telefono,
     required String correo,
     required String contrasena,
   }) {
@@ -51,18 +52,21 @@ class RegistroController extends ChangeNotifier {
       return 'Debes ingresar tu número de carnet';
     }
 
-    if (!RegExp(r'^[a-zA-Z0-9-]{4,24}$').hasMatch(carnetLimpio)) {
-      return 'El carnet debe tener entre 4 y 24 caracteres '
-          'y solo puede contener letras, números o guiones';
+    if (!RegExp(r'^[0-9]{4,24}$').hasMatch(carnetLimpio)) {
+      return 'El carnet debe tener entre 4 y 24 dígitos y solo números';
+    }
+
+    if (!RegExp(r'^\+[1-9][0-9]{7,14}$').hasMatch(telefono.trim())) {
+      return 'Ingresa el teléfono con prefijo internacional (ej. +584121234567)';
     }
 
     final correoValido = RegExp(
-      r'^[A-Za-z0-9._%+-]+@(correo\.unimet\.edu\.ve|unimet\.edu\.ve)$',
+      r'^[A-Za-z0-9._%+-]+@correo\.unimet\.edu\.ve$',
       caseSensitive: false,
     );
 
     if (!correoValido.hasMatch(correoLimpio)) {
-      return 'Debes utilizar un correo institucional UNIMET';
+      return 'Debes utilizar un correo @correo.unimet.edu.ve';
     }
 
     if (contrasena.length < 6) {
@@ -100,6 +104,7 @@ class RegistroController extends ChangeNotifier {
     required String nombre,
     required String cedula,
     required String carnet,
+    required String telefono,
     required String correo,
     required String contrasena,
   }) async {
@@ -111,6 +116,7 @@ class RegistroController extends ChangeNotifier {
       nombre: nombre,
       cedula: cedula,
       carnet: carnet,
+      telefono: telefono,
       correo: correo,
       contrasena: contrasena,
     );
@@ -149,6 +155,7 @@ class RegistroController extends ChangeNotifier {
         nombre: nombre.trim(),
         correo: correoNormalizado,
         carnet: carnet.trim(),
+        telefono: telefono.trim(),
       );
 
       // 3. Guardar perfil e índices en Firestore.
@@ -166,7 +173,7 @@ class RegistroController extends ChangeNotifier {
     } on ArgumentError catch (e) {
       mostrarError(
         'Los datos ingresados no son válidos. '
-        'Revisa la cédula y el carnet.',
+        'Revisa la cédula, el carnet y el teléfono.',
       );
       _registrarErrorTecnico(e);
     } on StateError catch (e) {
