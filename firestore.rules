@@ -871,8 +871,8 @@ service cloud.firestore {
         && d.keys().hasOnly([
           'estudianteUid', 'estudianteCedula',
           'estudianteNombre', 'estudianteCarnet',
-          'estudianteCorreo', 'deporteId',
-          'deporteNombre', 'entrenadorUid',
+          'estudianteCorreo', 'estudianteTelefono',
+          'deporteId', 'deporteNombre', 'entrenadorUid',
           'estado', 'motivo', 'fechaInscripcion',
           'fechaLimitePago', 'pagoId', 'historial'
         ])
@@ -884,6 +884,14 @@ service cloud.firestore {
         && d.estudianteNombre == u.nombre
         && d.estudianteCarnet == u.carnet
         && d.estudianteCorreo == u.correo
+        && d.get('estudianteTelefono', null) == u.get('telefono', null)
+        && (
+          d.get('estudianteTelefono', null) == null
+          || (
+            d.estudianteTelefono is string
+            && d.estudianteTelefono.matches('^[+][1-9][0-9]{1,14}$')
+          )
+        )
         && d.deporteNombre == deporte.nombre
         && d.entrenadorUid == deporte.entrenadorUid
         && d.estado == 'pendiente'
@@ -987,8 +995,18 @@ service cloud.firestore {
         && despues.estado == 'pendiente'
         && despues.diff(antes).affectedKeys().hasOnly([
           'estado', 'motivo', 'fechaInscripcion',
-          'fechaLimitePago', 'pagoId', 'historial'
+          'fechaLimitePago', 'pagoId', 'historial',
+          'estudianteTelefono'
         ])
+        && despues.get('estudianteTelefono', null)
+          == usuarioActual().get('telefono', null)
+        && (
+          despues.get('estudianteTelefono', null) == null
+          || (
+            despues.estudianteTelefono is string
+            && despues.estudianteTelefono.matches('^[+][1-9][0-9]{1,14}$')
+          )
+        )
         && despues.motivo == null
         && despues.pagoId == null
         && despues.fechaInscripcion is timestamp

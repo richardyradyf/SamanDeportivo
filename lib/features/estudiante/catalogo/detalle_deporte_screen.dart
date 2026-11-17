@@ -389,7 +389,7 @@ class _TarjetaInscripcion extends StatelessWidget {
       textoBoton = 'Verificando inscripción...';
       accion = null;
     } else if (estaConfirmada) {
-      textoBoton = 'Ya estás inscrito!';
+      textoBoton = '¡Ya estás inscrito!';
       accion = null;
     } else if (porPagar) {
       textoBoton = 'Confirmar Pago';

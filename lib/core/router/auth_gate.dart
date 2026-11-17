@@ -140,6 +140,7 @@ class AuthGate extends StatelessWidget {
 
       Rol.entrenador => InicioEntrenadorScreen(
         key: llave,
+        uid: persona.uid,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
@@ -150,6 +151,7 @@ class AuthGate extends StatelessWidget {
 
       Rol.administrador => InicioAdminScreen(
         key: llave,
+        uid: persona.uid,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
