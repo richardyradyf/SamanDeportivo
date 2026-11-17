@@ -235,7 +235,7 @@ void main() {
       );
 
       final boton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Ya estás inscrito!'),
+        find.widgetWithText(FilledButton, '¡Ya estás inscrito!'),
       );
       expect(boton.onPressed, isNull);
       expect(find.text('Inscribirme'), findsNothing);
