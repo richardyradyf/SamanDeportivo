@@ -3,6 +3,7 @@
 // npx firebase emulators:exec --config firebase.security.test.json \
 //   --project demo-saman-perfil --only firestore \
 //   "node --test test/firestore/asistencias.rules.test.mjs"
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test, { before, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
@@ -48,6 +49,31 @@ const registro = (uid, cambios = {}) => ({
 
 const idDe = (uid) => `FUT-01_2026-11-05_${uid}`;
 
+// Otra disciplina: BAS-01 es de ent-2 y est-m solo está inscrito ahí.
+const registroBas = (uid, cambios = {}) => registro(uid, {
+  inscripcionId: `${uid}_BAS-01`,
+  deporteId: 'BAS-01',
+  entrenadorUid: 'ent-2',
+  ...cambios,
+});
+
+const idBas = (uid) => `BAS-01_2026-11-05_${uid}`;
+
+/** Registros guardados de [uid] en FUT-01 el día de prueba, sin reglas. */
+const registrosDelDia = async (uid) => {
+  let docs = [];
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const res = await getDocs(query(
+      collection(ctx.firestore(), 'asistencias'),
+      where('estudianteUid', '==', uid),
+      where('deporteId', '==', 'FUT-01'),
+      where('fecha', '==', Timestamp.fromDate(dia)),
+    ));
+    docs = res.docs;
+  });
+  return docs;
+};
+
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-saman-perfil',
@@ -68,8 +94,18 @@ before(async () => {
     for (const uid of loteUids) {
       await setDoc(doc(db, 'inscripciones', `${uid}_FUT-01`), inscripcion(uid, 'confirmada'));
     }
-    // Registro ya guardado, para las pruebas de lectura y corrección.
+    await setDoc(doc(db, 'deportes', 'BAS-01'), {
+      codigo: 'BAS-01', nombre: 'Baloncesto', entrenadorUid: 'ent-2',
+    });
+    await setDoc(doc(db, 'inscripciones', 'est-m_BAS-01'), {
+      ...inscripcion('est-m', 'confirmada', 'ent-2'),
+      deporteId: 'BAS-01',
+      deporteNombre: 'Baloncesto',
+    });
+    // Registros ya guardados, para las pruebas de lectura y corrección.
     await setDoc(doc(db, 'asistencias', idDe('est-1')), registro('est-1'));
+    await setDoc(doc(db, 'asistencias', idDe('est-f')), registro('est-f', { estado: 'ausente' }));
+    await setDoc(doc(db, 'asistencias', idBas('est-m')), registroBas('est-m'));
   });
 });
 
@@ -160,6 +196,109 @@ test('el entrenador NO cambia el día de un registro', async () => {
   await assertFails(updateDoc(doc(entrenador(), 'asistencias', idDe('est-1')), {
     fecha: Timestamp.fromDate(new Date(2026, 10, 4)),
   }));
+});
+
+test('el entrenador corrige guardando el registro completo, como la app', async () => {
+  await assertSucceeds(setDoc(
+    doc(entrenador(), 'asistencias', idDe('est-f')),
+    registro('est-f', { estado: 'presente' }),
+  ));
+});
+
+test('la corrección actualiza el mismo documento y no crea otro', async () => {
+  const docs = await registrosDelDia('est-f');
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].id, idDe('est-f'));
+  assert.equal(docs[0].data().estado, 'presente');
+});
+
+test('el entrenador NO cambia el día al corregir con el registro completo', async () => {
+  await assertFails(setDoc(
+    doc(entrenador(), 'asistencias', idDe('est-f')),
+    registro('est-f', { fecha: Timestamp.fromDate(new Date(2026, 10, 4)) }),
+  ));
+});
+
+test('el entrenador NO cambia la hora de la fecha al corregir', async () => {
+  await assertFails(updateDoc(doc(entrenador(), 'asistencias', idDe('est-f')), {
+    fecha: Timestamp.fromDate(new Date(2026, 10, 5, 15, 30)),
+  }));
+});
+
+test('el entrenador NO pasa un registro a otro estudiante al corregir', async () => {
+  await assertFails(updateDoc(doc(entrenador(), 'asistencias', idDe('est-f')), {
+    estudianteUid: 'est-g',
+    inscripcionId: 'est-g_FUT-01',
+  }));
+});
+
+test('las correcciones rechazadas no cambian el registro', async () => {
+  const docs = await registrosDelDia('est-f');
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].data().estudianteUid, 'est-f');
+  assert.deepEqual(docs[0].data().fecha, Timestamp.fromDate(dia));
+});
+
+// Otra disciplina
+
+test('el entrenador de la otra disciplina sí registra en la suya', async () => {
+  await assertSucceeds(setDoc(
+    doc(otroEntrenador(), 'asistencias', idBas('est-m')),
+    registroBas('est-m', { estado: 'ausente' }),
+  ));
+});
+
+test('el entrenador NO registra asistencia en otra disciplina aunque firme como él', async () => {
+  await assertFails(setDoc(
+    doc(entrenador(), 'asistencias', idBas('est-m')),
+    registroBas('est-m', { entrenadorUid: 'ent-1' }),
+  ));
+});
+
+test('el entrenador NO registra en su disciplina a un inscrito de otra', async () => {
+  await assertFails(setDoc(
+    doc(entrenador(), 'asistencias', idDe('est-m')),
+    registro('est-m'),
+  ));
+});
+
+test('el entrenador NO usa la inscripción de otra disciplina en la suya', async () => {
+  await assertFails(setDoc(
+    doc(entrenador(), 'asistencias', idDe('est-m')),
+    registro('est-m', { inscripcionId: 'est-m_BAS-01' }),
+  ));
+});
+
+test('el entrenador NO corrige la asistencia de otra disciplina', async () => {
+  await assertFails(updateDoc(doc(entrenador(), 'asistencias', idBas('est-m')), {
+    estado: 'presente',
+  }));
+  await assertFails(setDoc(
+    doc(entrenador(), 'asistencias', idBas('est-m')),
+    registroBas('est-m', { entrenadorUid: 'ent-1', estado: 'presente' }),
+  ));
+});
+
+test('el entrenador NO lee la asistencia de otra disciplina', async () => {
+  await assertFails(getDoc(doc(entrenador(), 'asistencias', idBas('est-m'))));
+  await assertFails(getDocs(query(
+    collection(entrenador(), 'asistencias'),
+    where('deporteId', '==', 'BAS-01'),
+  )));
+  await assertFails(getDocs(query(
+    collection(entrenador(), 'asistencias'),
+    where('deporteId', '==', 'BAS-01'),
+    where('entrenadorUid', '==', 'ent-2'),
+  )));
+});
+
+test('la consulta del entrenador solo trae registros de su disciplina', async () => {
+  const res = await assertSucceeds(getDocs(query(
+    collection(entrenador(), 'asistencias'),
+    where('entrenadorUid', '==', 'ent-1'),
+  )));
+  assert.ok(res.size > 0);
+  assert.ok(res.docs.every((d) => d.data().deporteId === 'FUT-01'));
 });
 
 test('nadie borra un registro de asistencia', async () => {
