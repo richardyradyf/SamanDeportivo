@@ -129,7 +129,7 @@ class _PagosEstudianteSeccionState extends State<PagosEstudianteSeccion> {
                           ? 'Plazo vencido'
                           : 'Paga antes del ${_fecha(i.fechaLimitePago)}'),
                       trailing: FilledButton(
-                        onPressed: i.estaVencida() ? null : () => _pagar(i),
+                        onPressed: () => _pagar(i),
                         child: const Text('Pagar'),
                       ),
                     ),
