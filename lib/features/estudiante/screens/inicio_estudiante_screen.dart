@@ -12,6 +12,7 @@ import 'package:saman_deportivo/features/estudiante/catalogo/permiso_resena.dart
 import 'package:saman_deportivo/features/estudiante/inscripciones/screens/mis_inscripciones_screen.dart';
 import 'package:saman_deportivo/features/estudiante/mis_deportes/mis_deportes_screen.dart';
 import 'package:saman_deportivo/features/estudiante/widgets/sin_inscripciones_card.dart';
+import 'package:saman_deportivo/features/reservas/presentation/boton_reservas.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/inscripcion.dart';
@@ -248,6 +249,7 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
       titulo: 'Samán',
       subtitulo: Rol.estudiante.etiqueta,
       acciones: [
+        BotonReservas(rol: Rol.estudiante, usuarioUid: widget.uid),
         if (widget.pagos != null)
           IconButton(
             tooltip: 'Pagos',
