@@ -182,5 +182,29 @@ test('Estudiante no puede pagar un monto distinto al costo del deporte', async (
 test('Estudiante confirma su inscripción con un pago válido', async () => {
   const db = estudiante();
 
+  await env.withSecurityRulesDisabled(async (contexto) => {
+    const dbPrueba = contexto.firestore();
+
+    await updateDoc(doc(dbPrueba, 'usuarios', 'uid-a'), {
+      telefono: '+584121234567',
+    });
+
+    await updateDoc(doc(dbPrueba, 'inscripciones', 'uid-a_TEN-01'), {
+      estudianteTelefono: '+584121234567',
+    });
+  });
+
   await assertSucceeds(pagarYConfirmar(db, { orden: 'ORDEN-OK', monto: 10 }));
+
+  const registro = await getDoc(
+    doc(db, 'inscripciones', 'uid-a_TEN-01')
+  );
+
+  if (registro.data().estudianteTelefono !== '+584121234567') {
+    throw new Error('El telefono no se conservo durante el pago.');
+  }
+
+  if (registro.data().estado !== 'confirmada') {
+    throw new Error('La inscripcion no quedo confirmada.');
+  }
 });

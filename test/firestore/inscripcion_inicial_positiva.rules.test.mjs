@@ -272,3 +272,89 @@ test(
     });
   }
 );
+
+
+ // H4 Mariana: validacion del telefono en inscripciones.
+
+async function intentarInscripcionConTelefono(telefonoPerfil, telefonoInscripcion) {
+  await env.withSecurityRulesDisabled(async (contexto) => {
+    await updateDoc(
+      doc(contexto.firestore(), 'usuarios', uid),
+      { telefono: telefonoPerfil }
+    );
+  });
+
+  const db = dbPropietario();
+  const datos = datosInscripcion(new Date());
+
+  if (telefonoInscripcion !== undefined) {
+    datos.estudianteTelefono = telefonoInscripcion;
+  }
+
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'inscripciones', inscripcionId), datos);
+  lote.update(doc(db, 'deportes', codigo), {
+    cuposOcupados: 1,
+  });
+
+  return lote.commit();
+}
+
+test('H4-TEL-01: permite el telefono correcto del estudiante', async () => {
+  await assertSucceeds(
+    intentarInscripcionConTelefono('+584121234567', '+584121234567')
+  );
+
+  const registro = await getDoc(
+    doc(dbPropietario(), 'inscripciones', inscripcionId)
+  );
+
+  assert.equal(registro.data().estudianteTelefono, '+584121234567');
+});
+
+test('H4-TEL-02: rechaza un telefono diferente al perfil', async () => {
+  await assertFails(
+    intentarInscripcionConTelefono('+584121234567', '+584149876543')
+  );
+});
+
+test('H4-TEL-03: rechaza omitir el telefono cuando existe en el perfil', async () => {
+  await assertFails(
+    intentarInscripcionConTelefono('+584121234567', undefined)
+  );
+});
+
+test('H4-TEL-04: permite una inscripcion antigua sin telefono', async () => {
+  await crearInscripcion(dbPropietario());
+
+  const registro = await getDoc(
+    doc(dbPropietario(), 'inscripciones', inscripcionId)
+  );
+
+  assert.equal(registro.data().estudianteTelefono, undefined);
+});
+
+test('H4-TEL-05: rechaza un formato de telefono incorrecto', async () => {
+  await assertFails(
+    intentarInscripcionConTelefono('04121234567', '04121234567')
+  );
+});
+
+test('H4-TEL-06: impide modificar directamente el telefono', async () => {
+  await assertSucceeds(
+    intentarInscripcionConTelefono('+584121234567', '+584121234567')
+  );
+
+  const referencia = doc(
+    dbPropietario(), 'inscripciones', inscripcionId
+  );
+
+  await assertFails(
+    updateDoc(referencia, {
+      estudianteTelefono: '+584149876543',
+    })
+  );
+
+  const registro = await getDoc(referencia);
+  assert.equal(registro.data().estudianteTelefono, '+584121234567');
+});

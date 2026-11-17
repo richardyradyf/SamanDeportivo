@@ -33,6 +33,90 @@ void main() {
   });
 
   group('Reglas del modelo oficial de inscripciones', () {
+    test('La inscripción copia el teléfono del estudiante', () {
+      final inscripcion = Inscripcion.nueva(
+        estudiante: estudiante.copyWith(telefono: '+584121234567'),
+        deporte: deporte,
+        ahora: fechaInicial,
+      );
+
+      expect(inscripcion.estudianteTelefono, '+584121234567');
+      expect(inscripcion.toMap()['estudianteTelefono'], '+584121234567');
+    });
+
+    test('El teléfono se conserva al recuperar la inscripción', () {
+      final inscripcion = Inscripcion.nueva(
+        estudiante: estudiante.copyWith(telefono: '+584121234567'),
+        deporte: deporte,
+        ahora: fechaInicial,
+      );
+
+      final recuperada = Inscripcion.fromMap(
+        inscripcion.id,
+        inscripcion.toMap(),
+      );
+
+      expect(recuperada.estudianteTelefono, '+584121234567');
+    });
+
+    test('Las inscripciones antiguas pueden no tener teléfono', () {
+      final inscripcion = Inscripcion.nueva(
+        estudiante: estudiante,
+        deporte: deporte,
+        ahora: fechaInicial,
+      );
+
+      final datos = inscripcion.toMap();
+
+      expect(datos.containsKey('estudianteTelefono'), false);
+
+      final recuperada = Inscripcion.fromMap(inscripcion.id, datos);
+
+      expect(recuperada.estudianteTelefono, isNull);
+    });
+
+    test('El teléfono se conserva al cambiar de estado', () {
+      final inscripcion = Inscripcion.nueva(
+        estudiante: estudiante.copyWith(telefono: '+584121234567'),
+        deporte: deporte,
+        ahora: fechaInicial,
+      );
+
+      final confirmada = inscripcion.conEstado(
+        EstadoInscripcion.confirmada,
+        responsableUid: estudiante.uid,
+      );
+
+      expect(confirmada.estudianteTelefono, '+584121234567');
+      expect(confirmada.id, inscripcion.id);
+      expect(confirmada.estado, EstadoInscripcion.confirmada);
+    });
+
+    test('La reinscripción copia el teléfono actualizado', () {
+      final inscripcion = Inscripcion.nueva(
+        estudiante: estudiante.copyWith(telefono: '+584121234567'),
+        deporte: deporte,
+        ahora: fechaInicial,
+      );
+
+      final cancelada = inscripcion.conEstado(
+        EstadoInscripcion.cancelada,
+        responsableUid: estudiante.uid,
+        fecha: fechaInicial.add(const Duration(hours: 1)),
+      );
+
+      final reinscripcion = cancelada.reinscribir(
+        estudiante: estudiante.copyWith(telefono: '+584149876543'),
+        deporte: deporte,
+        ahora: fechaInicial.add(const Duration(days: 1)),
+      );
+
+      expect(reinscripcion.estudianteTelefono, '+584149876543');
+      expect(reinscripcion.id, inscripcion.id);
+      expect(reinscripcion.estado, EstadoInscripcion.pendiente);
+      expect(reinscripcion.historial.length, 3);
+    });
+
     test('Genera un identificador único por estudiante y deporte', () {
       final id = Inscripcion.idPara(estudiante.uid, deporte.codigo);
 
