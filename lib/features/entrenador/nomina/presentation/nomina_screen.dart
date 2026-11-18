@@ -47,7 +47,11 @@ class NominaScreen extends StatelessWidget {
                     title: Text(i.estudianteNombre),
                     subtitle: Text(
                       'Cédula ${i.estudianteCedula} · Carnet ${i.estudianteCarnet}\n'
-                      '${i.estudianteCorreo}',
+                      '${i.estudianteCorreo}\n'
+                      'Teléfono: ${_telefono(i)}',
+                    ),
+                    trailing: Chip(
+                      label: Text(i.estado.etiqueta),
                     ),
                     isThreeLine: true,
                   ),
@@ -57,5 +61,10 @@ class NominaScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  static String _telefono(Inscripcion i) {
+    final valor = i.estudianteTelefono?.trim();
+    return (valor == null || valor.isEmpty) ? 'No registrado' : valor;
   }
 }
