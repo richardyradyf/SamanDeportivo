@@ -3,9 +3,21 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:saman_deportivo/features/pagos/domain/resultado_paypal.dart';
 import 'package:saman_deportivo/features/pagos/presentation/pagar_inscripcion_screen.dart';
+import 'package:saman_deportivo/features/pagos/presentation/pagos_estudiante_seccion.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/inscripcion.dart';
+import 'package:saman_deportivo/models/pago.dart';
 import 'package:saman_deportivo/repositories/inscripcion_repository.dart';
+import 'package:saman_deportivo/repositories/pago_repository.dart';
+
+class _PagosFalsos implements PagoRepository {
+  @override
+  Stream<List<Pago>> observarDeEstudiante(String estudianteUid) =>
+      Stream.value(const []);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 Inscripcion _inscripcion() => Inscripcion(
       id: 'est-1_BAL-01',
@@ -121,5 +133,93 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('El plazo de pago ya venció.'), findsOneWidget);
+  });
+
+  testWidgets('muestra el aviso visible de entorno de prueba (sandbox)',
+      (tester) async {
+    await _mostrar(tester, (_, _, _) async {});
+
+    expect(
+      find.text('Entorno de prueba (sandbox) — no se cobra dinero real'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      'inscripción vencida: el botón Pagar queda deshabilitado',
+      (tester) async {
+    final vencida = Inscripcion(
+      id: 'est-1_BAL-01',
+      estudianteUid: 'est-1',
+      estudianteCedula: '28000001',
+      estudianteNombre: 'Ana Pérez',
+      estudianteCarnet: '20231001',
+      estudianteCorreo: 'ana@correo.unimet.edu.ve',
+      deporteId: 'BAL-01',
+      deporteNombre: 'Baloncesto',
+      estado: EstadoInscripcion.pendiente,
+      fechaInscripcion: DateTime(2020, 1, 1),
+      fechaLimitePago: DateTime(2020, 1, 2),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PagosEstudianteSeccion(
+          estudianteUid: 'est-1',
+          pagos: _PagosFalsos(),
+          pendientes: () => Stream.value([vencida]),
+          costoDe: (_) async => 10,
+          confirmar: (_, _, _) async {},
+          construirVista: _vistaFalsa,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final botonPagar = find.widgetWithText(FilledButton, 'Pagar');
+    expect(tester.widget<FilledButton>(botonPagar).onPressed, isNull);
+  });
+
+  testWidgets(
+      'inscripción pendiente vigente: el botón Pagar permite reintentar el pago',
+      (tester) async {
+    final vigente = Inscripcion(
+      id: 'est-1_BAL-01',
+      estudianteUid: 'est-1',
+      estudianteCedula: '28000001',
+      estudianteNombre: 'Ana Pérez',
+      estudianteCarnet: '20231001',
+      estudianteCorreo: 'ana@correo.unimet.edu.ve',
+      deporteId: 'BAL-01',
+      deporteNombre: 'Baloncesto',
+      estado: EstadoInscripcion.pendiente,
+      fechaInscripcion: DateTime.now(),
+      fechaLimitePago: DateTime.now().add(const Duration(hours: 24)),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PagosEstudianteSeccion(
+          estudianteUid: 'est-1',
+          pagos: _PagosFalsos(),
+          pendientes: () => Stream.value([vigente]),
+          costoDe: (_) async => 10,
+          confirmar: (_, _, _) async {},
+          construirVista: _vistaFalsa,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final botonPagar = find.widgetWithText(FilledButton, 'Pagar');
+    expect(tester.widget<FilledButton>(botonPagar).onPressed, isNotNull);
+
+    await tester.tap(botonPagar);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Entorno de prueba (sandbox) — no se cobra dinero real'),
+      findsOneWidget,
+    );
   });
 }
