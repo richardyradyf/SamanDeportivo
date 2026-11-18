@@ -155,6 +155,13 @@ test('un ID que no corresponde al registro se rechaza', async () => {
   ));
 });
 
+test('un ID con una fecha distinta a la del registro se rechaza', async () => {
+  await assertFails(setDoc(
+    doc(entrenador(), 'asistencias', 'FUT-01_2026-11-04_est-c'),
+    registro('est-c'),
+  ));
+});
+
 test('un estado distinto de presente o ausente se rechaza', async () => {
   await assertFails(setDoc(
     doc(entrenador(), 'asistencias', idDe('est-c')),

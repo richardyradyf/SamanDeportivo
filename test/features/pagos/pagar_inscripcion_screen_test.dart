@@ -146,7 +146,7 @@ void main() {
   });
 
   testWidgets(
-      'permite volver a abrir el pago de una inscripción pendiente aunque venció el plazo',
+      'inscripción vencida: el botón Pagar queda deshabilitado',
       (tester) async {
     final vencida = Inscripcion(
       id: 'est-1_BAL-01',
@@ -168,6 +168,41 @@ void main() {
           estudianteUid: 'est-1',
           pagos: _PagosFalsos(),
           pendientes: () => Stream.value([vencida]),
+          costoDe: (_) async => 10,
+          confirmar: (_, _, _) async {},
+          construirVista: _vistaFalsa,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final botonPagar = find.widgetWithText(FilledButton, 'Pagar');
+    expect(tester.widget<FilledButton>(botonPagar).onPressed, isNull);
+  });
+
+  testWidgets(
+      'inscripción pendiente vigente: el botón Pagar permite reintentar el pago',
+      (tester) async {
+    final vigente = Inscripcion(
+      id: 'est-1_BAL-01',
+      estudianteUid: 'est-1',
+      estudianteCedula: '28000001',
+      estudianteNombre: 'Ana Pérez',
+      estudianteCarnet: '20231001',
+      estudianteCorreo: 'ana@correo.unimet.edu.ve',
+      deporteId: 'BAL-01',
+      deporteNombre: 'Baloncesto',
+      estado: EstadoInscripcion.pendiente,
+      fechaInscripcion: DateTime.now(),
+      fechaLimitePago: DateTime.now().add(const Duration(hours: 24)),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PagosEstudianteSeccion(
+          estudianteUid: 'est-1',
+          pagos: _PagosFalsos(),
+          pendientes: () => Stream.value([vigente]),
           costoDe: (_) async => 10,
           confirmar: (_, _, _) async {},
           construirVista: _vistaFalsa,

@@ -1476,6 +1476,13 @@ service cloud.firestore {
     // El ID es {codigo}_{AAAA-MM-DD}_{estudianteUid}: un registro por día.
     // Cada registro hace 2 lecturas (deporte e inscripción); por eso la app
     // guarda la lista en lotes de 8 y no pasa el límite de 20 por lote.
+    function fechaAsistenciaCoincide(asistenciaId, deporteId, estudianteUid, fecha) {
+      let anio = string(fecha.year());
+      let mes = (fecha.month() < 10 ? '0' : '') + string(fecha.month());
+      let dia = (fecha.day() < 10 ? '0' : '') + string(fecha.day());
+      return asistenciaId == deporteId + '_' + anio + '-' + mes + '-' + dia + '_' + estudianteUid;
+    }
+
     function asistenciaValida(asistenciaId) {
       let d = request.resource.data;
       return autenticado()
@@ -1494,9 +1501,7 @@ service cloud.firestore {
         && d.fecha is timestamp
         && d.fecha <= request.time + duration.value(1, 'd')
         && d.entrenadorUid == request.auth.uid
-        && asistenciaId.matches(
-          '^' + d.deporteId + '_[0-9]{4}-[0-9]{2}-[0-9]{2}_' + d.estudianteUid + '$'
-        )
+        && fechaAsistenciaCoincide(asistenciaId, d.deporteId, d.estudianteUid, d.fecha)
         && d.inscripcionId == d.estudianteUid + '_' + d.deporteId
         && get(rutaDeporte(d.deporteId)).data.entrenadorUid == request.auth.uid
         && get(rutaInscripcion(d.inscripcionId)).data.estado == 'confirmada'

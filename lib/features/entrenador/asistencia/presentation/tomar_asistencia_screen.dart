@@ -168,18 +168,22 @@ class _SesionState extends State<_Sesion> {
       : 'Faltan $faltan estudiantes por marcar. Marca a todos antes de guardar.';
 
   Future<void> _guardar() async {
-    final inscritos = await widget.confirmadas(widget.deporte.codigo).first;
-    final faltan = _sinRegistrar(inscritos);
-    if (faltan > 0) {
-      if (mounted) {
-        setState(() => _mostrarFaltantes = true);
-        _aviso(_textoFaltan(faltan), error: true);
-      }
-      return;
-    }
-
+    if (_guardando) return;
     setState(() => _guardando = true);
     try {
+      final inscritos = await widget.confirmadas(widget.deporte.codigo).first;
+      final faltan = _sinRegistrar(inscritos);
+      if (faltan > 0) {
+        if (mounted) {
+          setState(() {
+            _mostrarFaltantes = true;
+            _guardando = false;
+          });
+          _aviso(_textoFaltan(faltan), error: true);
+        }
+        return;
+      }
+
       final correccion = _yaRegistrada;
       await widget.asistencias.guardarSesion([
         for (final i in inscritos)
