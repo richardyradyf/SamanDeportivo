@@ -18,6 +18,7 @@ class InicioEntrenadorScreen extends StatelessWidget {
     required this.nombre,
     required this.onCerrarSesion,
     this.perfil,
+    this.dashboard,
     this.disciplinas,
     this.estudiantes,
     this.asistencia,
@@ -34,6 +35,9 @@ class InicioEntrenadorScreen extends StatelessWidget {
 
   /// "Mis disciplinas" (módulo de Richard).
   final Widget? disciplinas;
+
+  /// Dashboard con la próxima sesión y los números (módulo de Richard).
+  final Widget? dashboard;
 
   /// Nómina, toma de asistencia e historial (módulo de Andrés). Si no se
   /// pasan, se muestra "próximamente".
@@ -56,11 +60,9 @@ class InicioEntrenadorScreen extends StatelessWidget {
           etiqueta: 'Dashboard',
           icono: Icons.dashboard_outlined,
           iconoSeleccionado: Icons.dashboard,
-          // La próxima sesión y las estadísticas llegan con los módulos de
-          // horarios y asistencia.
-          pantalla: PanelBienvenida(
-            saludo: PanelBienvenida.componer('Hola', nombre),
-          ),
+          pantalla:
+              dashboard ??
+              PanelBienvenida(saludo: PanelBienvenida.componer('Hola', nombre)),
         ),
         DestinoNavegacion(
           etiqueta: 'Mis disciplinas',

@@ -144,6 +144,10 @@ class AuthGate extends StatelessWidget {
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+        dashboard: DashboardEntrenadorFirebase(
+          uid: persona.uid,
+          nombre: persona.nombre,
+        ),
         disciplinas: MisDisciplinasFirebase(uid: persona.uid),
         estudiantes: NominaFirebase(uid: persona.uid),
         asistencia: TomarAsistenciaFirebase(uid: persona.uid),

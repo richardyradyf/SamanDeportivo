@@ -3,9 +3,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'package:saman_deportivo/features/admin/deportes/data/firestore_deporte_repository.dart';
+import 'package:saman_deportivo/features/admin/dashboard/domain/resumen_asistencia_admin.dart';
 import 'package:saman_deportivo/features/entrenador/asistencia/data/firestore_asistencia_repository.dart';
 import 'package:saman_deportivo/features/entrenador/asistencia/presentation/historial_asistencia_screen.dart';
 import 'package:saman_deportivo/features/entrenador/asistencia/presentation/tomar_asistencia_screen.dart';
+import 'package:saman_deportivo/features/entrenador/dashboard/dashboard_entrenador_screen.dart';
+import 'package:saman_deportivo/features/entrenador/dashboard/resumen_en_vivo.dart';
 import 'package:saman_deportivo/features/entrenador/disciplinas/mis_disciplinas_screen.dart';
 import 'package:saman_deportivo/features/entrenador/nomina/presentation/nomina_screen.dart';
 import 'package:saman_deportivo/features/entrenador/widgets/con_deporte.dart';
@@ -85,4 +88,34 @@ class MisDisciplinasFirebase extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       _conFirebase(() => MisDisciplinasScreen(deportes: _deportesDe(uid)));
+}
+
+class DashboardEntrenadorFirebase extends StatelessWidget {
+  const DashboardEntrenadorFirebase({
+    super.key,
+    required this.uid,
+    required this.nombre,
+  });
+
+  final String uid;
+  final String nombre;
+
+  @override
+  Widget build(BuildContext context) => _conFirebase(() {
+    final asistencias = FirestoreAsistenciaRepository(entrenadorUid: uid);
+    return DashboardEntrenadorScreen(
+      nombre: nombre,
+      resumen: resumenEnVivo(
+        deportes: _deportesDe(uid),
+        asistenciasDe: (codigo) {
+          final hoy = DateTime.now();
+          return asistencias.observarDeDeporte(
+            codigo,
+            desde: ResumenAsistenciaAdmin.inicioTresMeses(hoy),
+            hasta: DateTime(hoy.year, hoy.month, hoy.day + 1),
+          );
+        },
+      ),
+    );
+  });
 }
