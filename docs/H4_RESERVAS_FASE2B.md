@@ -24,7 +24,7 @@ La vista incluye dos días para detectar también reservas que cruzan medianoche
 
 ## Arquitectura
 
-`ReservasEspaciosScreen` recibe contratos de repositorio inyectables:
+`ReservasScreen` recibe contratos de repositorio inyectables:
 
 - `EspacioRepository` — catálogo de instalaciones.
 - `DeporteRepository` — horarios oficiales.
@@ -39,9 +39,9 @@ adicionales: usa el dominio y las transacciones del PR #46.
 
 ```bash
 git diff --check
-dart format lib/features/reservas/presentation test/features/reservas/reservas_espacios_screen_test.dart
+dart format lib/features/reservas/presentation test/features/reservas
 dart analyze
-flutter test test/features/reservas/reservas_espacios_screen_test.dart
+flutter test test/features/reservas
 flutter test test/features/reservas test/features/estudiante/screens/inicio_estudiante_screen_test.dart test/features/admin/screens/inicio_admin_screen_test.dart test/features/entrenador/screens/inicio_entrenador_screen_test.dart
 flutter test
 ```
