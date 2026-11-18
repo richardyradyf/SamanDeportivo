@@ -9,9 +9,11 @@ import 'package:saman_deportivo/features/entrenador/asistencia/presentation/hist
 import 'package:saman_deportivo/features/entrenador/asistencia/presentation/tomar_asistencia_screen.dart';
 import 'package:saman_deportivo/features/entrenador/dashboard/dashboard_entrenador_screen.dart';
 import 'package:saman_deportivo/features/entrenador/dashboard/resumen_en_vivo.dart';
+import 'package:saman_deportivo/features/entrenador/disciplinas/detalle_disciplina_screen.dart';
 import 'package:saman_deportivo/features/entrenador/disciplinas/mis_disciplinas_screen.dart';
 import 'package:saman_deportivo/features/entrenador/nomina/presentation/nomina_screen.dart';
 import 'package:saman_deportivo/features/entrenador/widgets/con_deporte.dart';
+import 'package:saman_deportivo/features/estudiante/catalogo/data/firestore_resena_repository.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/inscripcion.dart';
 
@@ -86,8 +88,19 @@ class MisDisciplinasFirebase extends StatelessWidget {
   final String uid;
 
   @override
-  Widget build(BuildContext context) =>
-      _conFirebase(() => MisDisciplinasScreen(deportes: _deportesDe(uid)));
+  Widget build(BuildContext context) => _conFirebase(
+    () => MisDisciplinasScreen(
+      deportes: _deportesDe(uid),
+      onAbrir: (deporte) => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => DetalleDisciplinaScreen(
+            deporte: deporte,
+            resenas: FirestoreResenaRepository().observar(deporte.codigo),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class DashboardEntrenadorFirebase extends StatelessWidget {
