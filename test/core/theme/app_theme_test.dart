@@ -52,7 +52,7 @@ void main() {
   test('NavigationRail usa el sidebar oscuro del Figma', () {
     final barra = tema.navigationRailTheme;
     expect(barra.backgroundColor, AppColors.primarioOscuro);
-    expect(barra.minExtendedWidth, 240);
+    expect(barra.minExtendedWidth, 276);
     expect(barra.indicatorColor, AppColors.sidebarSeleccion);
     expect(barra.selectedIconTheme?.color, Colors.white);
     expect(barra.unselectedIconTheme?.color, AppColors.sidebarTexto);

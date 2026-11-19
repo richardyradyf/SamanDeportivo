@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/features/reservas/presentation/reservas_screen.dart';
 import 'package:saman_deportivo/models/enums.dart';
 
@@ -13,9 +14,9 @@ class BotonReservas extends StatelessWidget {
   final String? usuarioUid;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: 'Reservas de espacios',
-    icon: const Icon(Icons.event_available_outlined),
+  Widget build(BuildContext context) => AccionNavegacion(
+    etiqueta: 'Reservas',
+    icono: Icons.event_available_outlined,
     onPressed: () => Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => Scaffold(

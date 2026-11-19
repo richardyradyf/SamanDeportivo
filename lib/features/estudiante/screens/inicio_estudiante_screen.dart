@@ -250,9 +250,9 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
       acciones: [
         BotonReservas(rol: Rol.estudiante, usuarioUid: widget.uid),
         if (widget.pagos != null)
-          IconButton(
-            tooltip: 'Pagos',
-            icon: const Icon(Icons.payments_outlined),
+          AccionNavegacion(
+            etiqueta: 'Pagos',
+            icono: Icons.payments_outlined,
             onPressed: () => _abrirPagos(context),
           ),
         BotonCerrarSesion(onConfirmar: widget.onCerrarSesion),
