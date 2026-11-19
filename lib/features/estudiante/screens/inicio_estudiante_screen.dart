@@ -125,28 +125,27 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
     _paraMisInscripciones = _conUltimoValor();
   }
 
-  /// Stream para "Mis inscripciones": entrega primero el último valor que
-  /// llegó (o el último error) y después cada cambio.
+  /// Stream para "Mis inscripciones": entrega primero el último valor
+  /// recibido y después los cambios. Admite nuevas suscripciones cuando
+  /// el usuario cambia de pestaña.
   Stream<List<Inscripcion>> _conUltimoValor() {
-    late final StreamController<List<Inscripcion>> salida;
-    StreamSubscription<List<Inscripcion>>? reenvio;
-    salida = StreamController<List<Inscripcion>>(
-      onListen: () {
-        final ultimo = _inscripciones.value;
-        final error = _error;
-        if (error != null) {
-          salida.addError(error);
-        } else if (ultimo != null) {
-          salida.add(ultimo);
-        }
-        reenvio = _cambios.stream.listen(
-          salida.add,
-          onError: salida.addError,
-        );
-      },
-      onCancel: () => reenvio?.cancel(),
-    );
-    return salida.stream;
+    return Stream<List<Inscripcion>>.multi((salida) {
+      final ultimo = _inscripciones.value;
+      final error = _error;
+
+      if (error != null) {
+        salida.addError(error);
+      } else if (ultimo != null) {
+        salida.add(ultimo);
+      }
+
+      final reenvio = _cambios.stream.listen(
+        salida.add,
+        onError: salida.addError,
+      );
+
+      salida.onCancel = reenvio.cancel;
+    }, isBroadcast: true);
   }
 
   @override
