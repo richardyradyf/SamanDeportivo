@@ -222,7 +222,9 @@ class _DisponibilidadViewState extends State<DisponibilidadView> {
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: _Chip(
-                        etiqueta: dia == hoy ? 'Hoy' : HoraCaracas.diaCorto(dia),
+                        etiqueta: dia == hoy
+                            ? 'Hoy'
+                            : HoraCaracas.diaCorto(dia),
                         elegido: dia == _dia,
                         alPulsar: () => _cambiarDia(dia),
                       ),
@@ -262,7 +264,8 @@ class _DisponibilidadViewState extends State<DisponibilidadView> {
             if (widget.rol == Rol.estudiante) ...[
               const SizedBox(height: 16),
               const RecuadroAviso(
-                texto: 'Como estudiante puedes reservar con un máximo de 21 '
+                texto:
+                    'Como estudiante puedes reservar con un máximo de 21 '
                     'días de anticipación y hasta 2 horas seguidas.',
               ),
             ],
@@ -344,6 +347,31 @@ class _FilaFranja extends StatelessWidget {
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     final descripcion = franja.descripcion;
+    final horario = Text(
+      HoraCaracas.rango(franja.inicio, franja.fin),
+      maxLines: 1,
+      softWrap: false,
+      style: tema.textTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: franja.estado == EstadoFranja.pasada
+            ? AppColors.textoSecundario
+            : AppColors.texto,
+      ),
+    );
+    final detalles = Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        EtiquetaReserva.franja(franja.estado),
+        if (descripcion != null)
+          Text(descripcion, style: tema.textTheme.bodySmall),
+      ],
+    );
+    final boton = franja.sePuedeReservar
+        ? TextButton(onPressed: onReservar, child: const Text('Reservar'))
+        : null;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -351,35 +379,39 @@ class _FilaFranja extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTheme.radioControl),
         border: Border.all(color: AppColors.borde),
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 112,
-            child: Text(
-              HoraCaracas.rango(franja.inicio, franja.fin),
-              style: tema.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: franja.estado == EstadoFranja.pasada
-                    ? AppColors.textoSecundario
-                    : AppColors.texto,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // En móvil se separa el rango horario de las acciones para
+          // evitar que "08:00 - 09:00" se parta en dos líneas.
+          if (constraints.maxWidth < 460) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                EtiquetaReserva.franja(franja.estado),
-                if (descripcion != null)
-                  Text(descripcion, style: tema.textTheme.bodySmall),
+                horario,
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    EtiquetaReserva.franja(franja.estado),
+                    if (descripcion != null)
+                      Text(descripcion, style: tema.textTheme.bodySmall),
+                    ?boton,
+                  ],
+                ),
               ],
-            ),
-          ),
-          if (franja.sePuedeReservar)
-            TextButton(onPressed: onReservar, child: const Text('Reservar')),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              SizedBox(width: 150, child: horario),
+              Expanded(child: detalles),
+              ?boton,
+            ],
+          );
+        },
       ),
     );
   }

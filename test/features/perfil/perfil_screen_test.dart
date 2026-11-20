@@ -103,12 +103,18 @@ void main() {
 
   testWidgets('edita telefono, cédula no editable', (tester) async {
     final repo = RepositorioFalso(perfil);
-    await tester.pumpWidget(MaterialApp(
-      theme: AppTheme.claro,
-      home: Scaffold(body: PerfilScreen(
-        uid: 'uid-demo', repository: repo, cerrarSesion: () async {},
-      )),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.claro,
+        home: Scaffold(
+          body: PerfilScreen(
+            uid: 'uid-demo',
+            repository: repo,
+            cerrarSesion: () async {},
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Editar perfil'));
     await tester.pumpAndSettle();
@@ -124,17 +130,25 @@ void main() {
 
   testWidgets('el cambio de correo solicita verificación', (tester) async {
     final repo = RepositorioFalso(perfil);
-    await tester.pumpWidget(MaterialApp(
-      theme: AppTheme.claro,
-      home: Scaffold(body: PerfilScreen(
-        uid: 'uid-demo', repository: repo, cerrarSesion: () async {},
-      )),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.claro,
+        home: Scaffold(
+          body: PerfilScreen(
+            uid: 'uid-demo',
+            repository: repo,
+            cerrarSesion: () async {},
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cambiar correo'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Nuevo correo'),
-        'nuevo@correo.unimet.edu.ve');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nuevo correo'),
+      'nuevo@correo.unimet.edu.ve',
+    );
     await tester.tap(find.text('Enviar verificación'));
     await tester.pumpAndSettle();
     expect(repo.cambioCorreoSolicitado, 'nuevo@correo.unimet.edu.ve');
@@ -164,6 +178,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(llamados, 1);
   });
+  testWidgets('nombres y correos largos permanecen en una línea', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final nombreLargo = 'María Alejandra Fernández Rodríguez González';
+    final perfilLargo = PerfilUsuario.fromMap('uid-demo', {
+      'cedula': '12345678',
+      'nombre': nombreLargo,
+      'correo': 'maria.alejandra.fernandez@correo.unimet.edu.ve',
+      'rol': 'estudiante',
+      'carnet': '202611111',
+      'telefono': '+584121234567',
+      'estado': 'activo',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.claro,
+        home: Scaffold(
+          body: PerfilScreen(
+            uid: 'uid-demo',
+            repository: RepositorioFalso(perfilLargo),
+            cerrarSesion: () async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final nombre = tester.widget<Text>(
+      find.byWidgetPredicate(
+        (widget) => widget is Text && widget.data == nombreLargo,
+      ),
+    );
+    expect(nombre.maxLines, 1);
+    expect(nombre.overflow, TextOverflow.ellipsis);
+    expect(
+      tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .every((texto) => texto.maxLines == 1),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('el perfil usa colores y tipografia del tema Figma', (
     tester,
   ) async {
