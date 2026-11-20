@@ -149,6 +149,28 @@ class _PagarInscripcionScreenState extends State<PagarInscripcionScreen> {
           Text(widget.inscripcion.deporteNombre,
               style: tema.textTheme.headlineSmall),
           Text('Monto: ${widget.monto.toStringAsFixed(2)} USD'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: tema.colorScheme.tertiaryContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.science_outlined,
+                    size: 16, color: tema.colorScheme.onTertiaryContainer),
+                const SizedBox(width: 6),
+                Text(
+                  'Entorno de prueba (sandbox) — no se cobra dinero real',
+                  style: tema.textTheme.labelSmall?.copyWith(
+                    color: tema.colorScheme.onTertiaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -185,7 +207,7 @@ class _PagarInscripcionScreenState extends State<PagarInscripcionScreen> {
               style: TextStyle(color: _error ? tema.colorScheme.error : null),
             ),
           ),
-          const Spacer(),
+          const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

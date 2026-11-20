@@ -1,10 +1,15 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:saman_deportivo/core/utils/busqueda_normalizada.dart';
+import 'package:saman_deportivo/features/admin/espacios/data/espacio_repository.dart';
+import 'package:saman_deportivo/features/admin/espacios/data/firestore_espacio_repository.dart';
+import 'package:saman_deportivo/features/admin/espacios/presentation/espacios_admin_screen.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/data/entrenador_repository.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/domain/gestion_agenda_entrenador.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/entrenador.dart';
 import 'package:saman_deportivo/models/enums.dart';
+import 'package:saman_deportivo/models/espacio_deportivo.dart';
 import 'package:saman_deportivo/models/horario_sesion.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 
@@ -18,11 +23,13 @@ class HorariosAdminScreen extends StatefulWidget {
     this.deportes,
     this.entrenadores,
     this.agendaGateway,
+    this.espacios,
   });
 
   final DeporteRepository? deportes;
   final EntrenadorRepository? entrenadores;
   final AgendaMutaciones? agendaGateway;
+  final EspacioRepository? espacios;
 
   @override
   State<HorariosAdminScreen> createState() => _HorariosAdminScreenState();
@@ -33,6 +40,7 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
   late final Stream<List<Deporte>>? _deportes;
   late final Stream<List<Entrenador>>? _entrenadores;
   late final GestionAgendaEntrenador? _gestion;
+  late final EspacioRepository? _espaciosRepositorio;
 
   @override
   void initState() {
@@ -45,6 +53,9 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
             widget.deportes!,
             mutaciones: widget.agendaGateway,
           );
+    _espaciosRepositorio =
+        widget.espacios ??
+        (Firebase.apps.isEmpty ? null : FirestoreEspacioRepository());
     _busqueda.addListener(_refrescar);
   }
 
@@ -96,10 +107,21 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
     if (gestion == null) {
       return;
     }
+    List<EspacioDeportivo>? espacios;
+    try {
+      espacios = await _espaciosRepositorio?.observarTodos().first;
+    } catch (error) {
+      _informarError(error);
+      return;
+    }
+    if (!mounted) return;
     final actualizado = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          _DialogoHorarios(deporte: deporte, gestion: gestion),
+      builder: (context) => _DialogoHorarios(
+        deporte: deporte,
+        gestion: gestion,
+        espacios: espacios,
+      ),
     );
     if (!mounted || actualizado != true) {
       return;
@@ -164,6 +186,23 @@ class _HorariosAdminScreenState extends State<HorariosAdminScreen> {
             'Gestiona las sesiones y el entrenador asignado a cada deporte.',
             style: tema.textTheme.bodySmall,
           ),
+          if (_espaciosRepositorio != null) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('administrar-espacios'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        EspaciosAdminScreen(repositorio: _espaciosRepositorio),
+                  ),
+                ),
+                icon: const Icon(Icons.stadium_outlined),
+                label: const Text('Administrar espacios'),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           TextField(
             key: const Key('buscar-agenda'),
@@ -466,18 +505,21 @@ class _BorradorHorario {
     : dia = original?.dia ?? DiaSemana.lunes,
       inicio = TextEditingController(text: original?.horaInicio ?? '16:00'),
       fin = TextEditingController(text: original?.horaFin ?? '18:00'),
-      lugar = TextEditingController(text: original?.lugar ?? '');
+      lugar = TextEditingController(text: original?.lugar ?? ''),
+      espacioId = original?.espacioId;
 
   DiaSemana dia;
   final TextEditingController inicio;
   final TextEditingController fin;
   final TextEditingController lugar;
+  String? espacioId;
 
   HorarioSesion guardar() => HorarioSesion(
     dia: dia,
     horaInicio: inicio.text.trim(),
     horaFin: fin.text.trim(),
     lugar: lugar.text.trim(),
+    espacioId: espacioId,
   );
 
   void dispose() {
@@ -488,10 +530,15 @@ class _BorradorHorario {
 }
 
 class _DialogoHorarios extends StatefulWidget {
-  const _DialogoHorarios({required this.deporte, required this.gestion});
+  const _DialogoHorarios({
+    required this.deporte,
+    required this.gestion,
+    this.espacios,
+  });
 
   final Deporte deporte;
   final GestionAgendaEntrenador gestion;
+  final List<EspacioDeportivo>? espacios;
 
   @override
   State<_DialogoHorarios> createState() => _DialogoHorariosState();
@@ -580,6 +627,15 @@ class _DialogoHorariosState extends State<_DialogoHorarios> {
                         icon: const Icon(Icons.add),
                         label: const Text('Agregar sesión'),
                       ),
+                      if (widget.espacios != null &&
+                          widget.espacios!.every((e) => !e.activo))
+                        const Padding(
+                          padding: EdgeInsets.only(top: 10),
+                          child: Text(
+                            'Registra un espacio activo antes de '
+                            'programar nuevas sesiones.',
+                          ),
+                        ),
                       if (_error != null) ...[
                         const SizedBox(height: 10),
                         Text(
@@ -688,15 +744,53 @@ class _DialogoHorariosState extends State<_DialogoHorarios> {
             ],
           ),
           const SizedBox(height: 8),
-          TextFormField(
-            key: Key('lugar-$indice'),
-            controller: horario.lugar,
-            maxLength: 100,
-            decoration: const InputDecoration(labelText: 'Lugar'),
-            validator: (valor) => (valor ?? '').trim().isNotEmpty
-                ? null
-                : 'Indica un lugar de entrenamiento.',
-          ),
+          if (widget.espacios == null)
+            // Solo para pruebas antiguas sin Firebase. En producción siempre
+            // se selecciona un espacio existente mediante la lista inferior.
+            TextFormField(
+              key: Key('lugar-$indice'),
+              controller: horario.lugar,
+              maxLength: 100,
+              decoration: const InputDecoration(labelText: 'Lugar'),
+              validator: (valor) => (valor ?? '').trim().isNotEmpty
+                  ? null
+                  : 'Indica un lugar de entrenamiento.',
+            )
+          else
+            DropdownButtonFormField<String>(
+              key: Key('espacio-$indice'),
+              initialValue:
+                  widget.espacios!.any(
+                    (e) => e.activo && e.id == horario.espacioId,
+                  )
+                  ? horario.espacioId
+                  : null,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Espacio deportivo'),
+              items: [
+                for (final espacio in widget.espacios!.where((e) => e.activo))
+                  DropdownMenuItem(
+                    value: espacio.id,
+                    child: Text(
+                      '${espacio.nombre} · ${espacio.tipo}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: _guardando
+                  ? null
+                  : (id) {
+                      final seleccionado = widget.espacios!
+                          .where((e) => e.id == id)
+                          .firstOrNull;
+                      setState(() {
+                        horario.espacioId = id;
+                        horario.lugar.text = seleccionado?.nombre ?? '';
+                      });
+                    },
+              validator: (id) =>
+                  id == null ? 'Selecciona un espacio registrado.' : null,
+            ),
         ],
       ),
     );

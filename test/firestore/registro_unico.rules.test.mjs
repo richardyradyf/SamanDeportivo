@@ -32,7 +32,7 @@ after(async () => {
 
 function estudiante(uid) {
   return env.authenticatedContext(uid, {
-    email: `${uid}@unimet.edu.ve`,
+    email: `${uid}@correo.unimet.edu.ve`,
   }).firestore();
 }
 
@@ -40,9 +40,10 @@ function datosEstudiante(uid, cedula, carnet) {
   return {
     cedula,
     nombre: 'Estudiante de Prueba',
-    correo: `${uid}@unimet.edu.ve`,
+    correo: `${uid}@correo.unimet.edu.ve`,
     rol: 'estudiante',
     carnet,
+    telefono: '+584121234567',
     estado: 'activo',
   };
 }
@@ -66,6 +67,65 @@ test('registro completo con cedula y carnet nuevos', async () => {
   await assertSucceeds(
     registrar('uid-unico-a', '28111001', '20261001'),
   );
+});
+
+test('rechaza carnet alfanumérico aunque el índice exista', async () => {
+  await assertFails(registrar('uid-carnet-letras', '28111088', 'UNI-2026'));
+});
+
+test('rechaza teléfono sin código internacional', async () => {
+  const uid = 'uid-telefono-invalido';
+  const db = estudiante(uid);
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'usuarios', uid), {
+    ...datosEstudiante(uid, '28111089', '20261089'),
+    telefono: '04121234567',
+  });
+  batch.set(doc(db, 'cedulas', '28111089'), { uid });
+  batch.set(doc(db, 'carnets', '20261089'), { uid });
+  await assertFails(batch.commit());
+});
+
+test('el estudiante modifica su teléfono sin alterar la cédula', async () => {
+  const uid = 'uid-telefono-edicion';
+  await assertSucceeds(registrar(uid, '28111090', '20261090'));
+  const db = estudiante(uid);
+  await assertSucceeds(updateDoc(doc(db, 'usuarios', uid), {
+    telefono: '+573001234567',
+  }));
+  await assertFails(updateDoc(doc(db, 'usuarios', uid), {
+    cedula: '28111091',
+  }));
+});
+
+test('correo del perfil solo cambia cuando coincide con Auth', async () => {
+  const uid = 'uid-correo-edicion';
+  await assertSucceeds(registrar(uid, '28111092', '20261092'));
+  const db = estudiante(uid);
+  await assertFails(updateDoc(doc(db, 'usuarios', uid), {
+    correo: 'otra@correo.unimet.edu.ve',
+  }));
+  const dbVerificado = env.authenticatedContext(uid, {
+    email: 'otra@correo.unimet.edu.ve',
+  }).firestore();
+  await assertSucceeds(updateDoc(doc(dbVerificado, 'usuarios', uid), {
+    correo: 'otra@correo.unimet.edu.ve',
+  }));
+});
+
+test('registro de estudiante rechaza dominio antiguo', async () => {
+  const uid = 'uid-correo-antiguo';
+  const db = env.authenticatedContext(uid, {
+    email: `${uid}@unimet.edu.ve`,
+  }).firestore();
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'usuarios', uid), {
+    ...datosEstudiante(uid, '28111093', '20261093'),
+    correo: `${uid}@unimet.edu.ve`,
+  });
+  batch.set(doc(db, 'cedulas', '28111093'), { uid });
+  batch.set(doc(db, 'carnets', '20261093'), { uid });
+  await assertFails(batch.commit());
 });
 
 test('rechazar una cedula registrada por otro estudiante', async () => {

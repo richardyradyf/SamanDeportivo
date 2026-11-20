@@ -4,6 +4,7 @@ import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/panel_bienvenida.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
+import 'package:saman_deportivo/features/reservas/presentation/boton_reservas.dart';
 import 'package:saman_deportivo/models/enums.dart';
 
 /// Pantalla de inicio del entrenador, según el Figma: Dashboard,
@@ -17,9 +18,12 @@ class InicioEntrenadorScreen extends StatelessWidget {
     required this.nombre,
     required this.onCerrarSesion,
     this.perfil,
+    this.dashboard,
+    this.disciplinas,
     this.estudiantes,
     this.asistencia,
     this.historial,
+    this.uid,
   });
 
   final String nombre;
@@ -29,37 +33,47 @@ class InicioEntrenadorScreen extends StatelessWidget {
   /// muestra un aviso de "próximamente".
   final Widget? perfil;
 
+  /// "Mis disciplinas" (módulo de Richard).
+  final Widget? disciplinas;
+
+  /// Dashboard con la próxima sesión y los números (módulo de Richard).
+  final Widget? dashboard;
+
   /// Nómina, toma de asistencia e historial (módulo de Andrés). Si no se
   /// pasan, se muestra "próximamente".
   final Widget? estudiantes;
   final Widget? asistencia;
   final Widget? historial;
+  final String? uid;
 
   @override
   Widget build(BuildContext context) {
     return LayoutResponsivo(
       titulo: 'Samán',
       subtitulo: Rol.entrenador.etiqueta,
-      acciones: [BotonCerrarSesion(onConfirmar: onCerrarSesion)],
+      acciones: [
+        BotonReservas(rol: Rol.entrenador, usuarioUid: uid),
+        BotonCerrarSesion(onConfirmar: onCerrarSesion),
+      ],
       destinos: [
         DestinoNavegacion(
           etiqueta: 'Dashboard',
           icono: Icons.dashboard_outlined,
           iconoSeleccionado: Icons.dashboard,
-          // La próxima sesión y las estadísticas llegan con los módulos de
-          // horarios y asistencia.
-          pantalla: PanelBienvenida(
-            saludo: PanelBienvenida.componer('Hola', nombre),
-          ),
+          pantalla:
+              dashboard ??
+              PanelBienvenida(saludo: PanelBienvenida.componer('Hola', nombre)),
         ),
-        const DestinoNavegacion(
+        DestinoNavegacion(
           etiqueta: 'Mis disciplinas',
           icono: Icons.sports_outlined,
           iconoSeleccionado: Icons.sports,
-          pantalla: SeccionPendiente(
-            titulo: 'Mis disciplinas',
-            icono: Icons.sports,
-          ),
+          pantalla:
+              disciplinas ??
+              const SeccionPendiente(
+                titulo: 'Mis disciplinas',
+                icono: Icons.sports,
+              ),
         ),
         DestinoNavegacion(
           etiqueta: 'Estudiantes',

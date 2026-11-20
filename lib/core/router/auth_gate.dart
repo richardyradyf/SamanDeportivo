@@ -140,9 +140,15 @@ class AuthGate extends StatelessWidget {
 
       Rol.entrenador => InicioEntrenadorScreen(
         key: llave,
+        uid: persona.uid,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),
+        dashboard: DashboardEntrenadorFirebase(
+          uid: persona.uid,
+          nombre: persona.nombre,
+        ),
+        disciplinas: MisDisciplinasFirebase(uid: persona.uid),
         estudiantes: NominaFirebase(uid: persona.uid),
         asistencia: TomarAsistenciaFirebase(uid: persona.uid),
         historial: HistorialAsistenciaFirebase(uid: persona.uid),
@@ -150,6 +156,7 @@ class AuthGate extends StatelessWidget {
 
       Rol.administrador => InicioAdminScreen(
         key: llave,
+        uid: persona.uid,
         nombre: persona.nombre,
         onCerrarSesion: sesion.cerrarSesion,
         perfil: construirPerfil(persona, sesion),

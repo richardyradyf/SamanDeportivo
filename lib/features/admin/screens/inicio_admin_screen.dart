@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:saman_deportivo/core/widgets/boton_cerrar_sesion.dart';
 import 'package:saman_deportivo/core/widgets/layout_responsivo.dart';
 import 'package:saman_deportivo/core/widgets/seccion_pendiente.dart';
+import 'package:saman_deportivo/features/reservas/presentation/boton_reservas.dart';
 import 'package:saman_deportivo/models/enums.dart';
 
 /// Pantalla de inicio del administrador, según el Figma: Dashboard,
@@ -27,6 +28,7 @@ class InicioAdminScreen extends StatelessWidget {
     required this.nombre,
     required this.onCerrarSesion,
     this.perfil,
+    this.uid,
   });
 
   final String nombre;
@@ -35,13 +37,17 @@ class InicioAdminScreen extends StatelessWidget {
   /// Perfil del administrador, integrado dentro de Configuración.
   /// Si se omite, mantenemos el placeholder usado por pruebas existentes.
   final Widget? perfil;
+  final String? uid;
 
   @override
   Widget build(BuildContext context) {
     return LayoutResponsivo(
       titulo: 'Samán',
       subtitulo: Rol.administrador.etiqueta,
-      acciones: [BotonCerrarSesion(onConfirmar: onCerrarSesion)],
+      acciones: [
+        BotonReservas(rol: Rol.administrador, usuarioUid: uid),
+        BotonCerrarSesion(onConfirmar: onCerrarSesion),
+      ],
       destinos: [
         DestinoNavegacion(
           etiqueta: 'Dashboard',

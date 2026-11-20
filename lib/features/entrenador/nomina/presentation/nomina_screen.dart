@@ -43,13 +43,60 @@ class NominaScreen extends StatelessWidget {
               const SizedBox(height: 8),
               for (final i in lista)
                 Card(
-                  child: ListTile(
-                    title: Text(i.estudianteNombre),
-                    subtitle: Text(
-                      'Cédula ${i.estudianteCedula} · Carnet ${i.estudianteCarnet}\n'
-                      '${i.estudianteCorreo}',
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                i.estudianteNombre,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                i.estado.etiqueta,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Cédula ${i.estudianteCedula} · Carnet ${i.estudianteCarnet}',
+                        ),
+                        Text(
+                          i.estudianteCorreo,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        Text(
+                          'Teléfono: ${_telefono(i)}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
-                    isThreeLine: true,
                   ),
                 ),
             ],
@@ -57,5 +104,10 @@ class NominaScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  static String _telefono(Inscripcion i) {
+    final valor = i.estudianteTelefono?.trim();
+    return (valor == null || valor.isEmpty) ? 'No registrado' : valor;
   }
 }

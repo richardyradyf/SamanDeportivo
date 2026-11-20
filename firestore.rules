@@ -32,6 +32,13 @@ service cloud.firestore {
         ).data.uid == uid;
     }
 
+    // Perfiles antiguos pueden no tener telefono; si existe, siempre es E.164.
+    function telefonoValido(d) {
+      return !('telefono' in d)
+        || (d.telefono is string
+          && d.telefono.matches('^[+][1-9][0-9]{7,14}$'));
+    }
+
     function nuevoEstudianteValido(uid) {
       let d = request.resource.data;
 
@@ -40,7 +47,7 @@ service cloud.firestore {
           'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
         ])
         && d.keys().hasOnly([
-          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado'
+          'cedula', 'nombre', 'correo', 'rol', 'carnet', 'estado', 'telefono'
         ])
         && d.rol == 'estudiante'
         && d.estado == 'activo'
@@ -49,10 +56,12 @@ service cloud.firestore {
         && d.nombre.size() <= 100
         && d.correo is string
         && d.correo == request.auth.token.email
+        && d.correo.matches('^[A-Za-z0-9._%+-]+@correo[.]unimet[.]edu[.]ve$')
         && d.cedula is string
         && d.cedula.matches('^[0-9]{5,20}$')
         && d.carnet is string
-        && d.carnet.matches('^[a-zA-Z0-9-]{4,24}$')
+        && d.carnet.matches('^[0-9]{4,24}$')
+        && telefonoValido(d)
         && indicesEstudianteValidos(uid, d.cedula, d.carnet);
     }
 
@@ -97,7 +106,7 @@ service cloud.firestore {
         ]
         && cambiados.hasOnly(
           resource.data.rol == 'estudiante'
-            ? ['nombre', 'carnet']
+            ? ['nombre', 'carnet', 'telefono', 'correo']
             : ['nombre']
         )
         && request.resource.data.nombre is string
@@ -107,12 +116,23 @@ service cloud.firestore {
           resource.data.rol != 'estudiante'
           || (
             request.resource.data.carnet is string
-            && request.resource.data.carnet.matches(
-              '^[a-zA-Z0-9-]{4,24}$'
+            && telefonoValido(request.resource.data)
+            && (
+              !cambiados.hasAny(['correo'])
+              || (
+                request.resource.data.correo is string
+                && request.resource.data.correo == request.auth.token.email
+                && request.resource.data.correo.matches(
+                  '^[A-Za-z0-9._%+-]+@correo[.]unimet[.]edu[.]ve$'
+                )
+              )
             )
             && (
               request.resource.data.carnet == resource.data.carnet
-              || cambioCarnetValido()
+              || (
+                request.resource.data.carnet.matches('^[0-9]{4,24}$')
+                && cambioCarnetValido()
+              )
             )
           )
         );
@@ -191,7 +211,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.keys().hasAll(['uid'])
         && request.resource.data.uid == request.auth.uid
-        && carnet.matches('^[a-zA-Z0-9-]{4,24}$')
+        && carnet.matches('^[0-9]{4,24}$')
         && getAfter(
           /databases/$(database)/documents/usuarios/$(request.auth.uid)
         ).data.rol == 'estudiante'
@@ -258,6 +278,22 @@ service cloud.firestore {
     // Agregar reglas por entidad de modo revisado, nunca allow write: if true.
     // A1 HITO 3: Administracion de deportes (PR de Alexander)
     // Solo datos publicos de catalogo. El resto de colecciones sigue cerrado.
+    function datosEspacioValidos() {
+      let d = request.resource.data;
+      return d.keys().hasAll([
+          'nombre', 'tipo', 'descripcion', 'activo', 'creadoEn', 'actualizadoEn'
+        ])
+        && d.keys().hasOnly([
+          'nombre', 'tipo', 'descripcion', 'activo', 'creadoEn', 'actualizadoEn'
+        ])
+        && d.nombre is string && d.nombre.size() >= 3 && d.nombre.size() <= 100
+        && d.tipo is string && d.tipo.size() >= 1 && d.tipo.size() <= 60
+        && d.descripcion is string && d.descripcion.size() <= 500
+        && d.activo is bool
+        && d.creadoEn is timestamp
+        && d.actualizadoEn is timestamp;
+    }
+
     function datosDeporteValidos(codigo) {
       let d = request.resource.data;
       return d.keys().hasAll([
@@ -540,6 +576,94 @@ service cloud.firestore {
         && getAfter(rutaDeporte(d.codigoDeporte)).data.actualizadoEn == request.time;
     }
 
+    // H4: clases y reservas utilizan el MISMO contador control/agenda.
+    // Los cambios simultáneos de agenda y reservas quedan serializados.
+    function rutaReservaEspacio(id) {
+      return /databases/$(database)/documents/reservasEspacios/$(id);
+    }
+
+    function rutaOcupacionEspacio(id) {
+      return /databases/$(database)/documents/ocupacionesEspacios/$(id);
+    }
+
+    function reservaConControl(id, accion) {
+      let ruta = rutaControlAgenda();
+      return existsAfter(ruta)
+        && getAfter(ruta).data.reservaId == id
+        && getAfter(ruta).data.accion == accion
+        && getAfter(ruta).data.actualizadoEn == request.time
+        && getAfter(ruta).data.version ==
+          (exists(ruta) ? get(ruta).data.version : 0) + 1;
+    }
+
+    function controlReservaValido() {
+      let d = request.resource.data;
+      let r = rutaReservaEspacio(d.reservaId);
+      let o = rutaOcupacionEspacio(d.reservaId);
+      return autenticado()
+        && d.keys().hasAll(['version', 'reservaId', 'accion', 'actualizadoEn'])
+        && d.keys().hasOnly(['version', 'reservaId', 'accion', 'actualizadoEn'])
+        && d.version is int && d.version >= 1
+        && d.reservaId is string && d.reservaId.size() >= 1
+        && d.accion in ['crear', 'cancelar']
+        && d.actualizadoEn == request.time
+        && existsAfter(r)
+        && getAfter(r).data.usuarioUid == request.auth.uid
+        && (
+          (d.accion == 'crear'
+            && !exists(r)
+            && getAfter(r).data.estado == 'activa'
+            && existsAfter(o))
+          || (d.accion == 'cancelar'
+            && exists(r)
+            && get(r).data.estado == 'activa'
+            && request.time < get(r).data.inicio
+            && getAfter(r).data.estado == 'cancelada'
+            && !existsAfter(o))
+        );
+    }
+
+    function datosReservaNuevaValidos() {
+      let d = request.resource.data;
+      let usuario = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let espacio = /databases/$(database)/documents/espacios/$(d.espacioId);
+      return autenticado()
+        && d.keys().hasAll([
+          'espacioId', 'usuarioUid', 'rol', 'inicio', 'fin', 'motivo',
+          'estado', 'creadoEn', 'actualizadoEn'
+        ])
+        && d.keys().hasOnly([
+          'espacioId', 'usuarioUid', 'rol', 'inicio', 'fin', 'motivo',
+          'estado', 'creadoEn', 'actualizadoEn'
+        ])
+        && d.usuarioUid == request.auth.uid
+        && d.espacioId is string && d.espacioId.size() >= 1
+        && exists(espacio) && get(espacio).data.activo == true
+        && exists(usuario) && d.rol == get(usuario).data.rol
+        && d.rol in ['estudiante', 'entrenador', 'administrador']
+        && d.inicio is timestamp && d.fin is timestamp
+        && d.inicio > request.time && d.fin > d.inicio
+        && (d.rol != 'estudiante' || (
+          d.fin - d.inicio <= duration.value(2, 'h')
+          && d.fin <= request.time + duration.value(21, 'd')
+        ))
+        && d.motivo is string
+        && d.motivo.size() >= 3 && d.motivo.size() <= 200
+        && d.estado == 'activa'
+        && d.creadoEn == request.time
+        && d.actualizadoEn == null;
+    }
+
+    function ocupacionCoincideConReserva(id) {
+      let r = getAfter(rutaReservaEspacio(id)).data;
+      let d = request.resource.data;
+      return d.keys().hasAll(['espacioId', 'inicio', 'fin'])
+        && d.keys().hasOnly(['espacioId', 'inicio', 'fin'])
+        && d.espacioId == r.espacioId
+        && d.inicio == r.inicio
+        && d.fin == r.fin;
+    }
+
     // H3 Andrés — Pagos con PayPal JS SDK (sin Cloud Functions).
     // La app registra el pago capturado en el navegador. Estas reglas
     // obligan a que pago, confirmación y cupo se escriban juntos.
@@ -748,8 +872,8 @@ service cloud.firestore {
         && d.keys().hasOnly([
           'estudianteUid', 'estudianteCedula',
           'estudianteNombre', 'estudianteCarnet',
-          'estudianteCorreo', 'deporteId',
-          'deporteNombre', 'entrenadorUid',
+          'estudianteCorreo', 'estudianteTelefono',
+          'deporteId', 'deporteNombre', 'entrenadorUid',
           'estado', 'motivo', 'fechaInscripcion',
           'fechaLimitePago', 'pagoId', 'historial'
         ])
@@ -761,6 +885,14 @@ service cloud.firestore {
         && d.estudianteNombre == u.nombre
         && d.estudianteCarnet == u.carnet
         && d.estudianteCorreo == u.correo
+        && d.get('estudianteTelefono', null) == u.get('telefono', null)
+        && (
+          d.get('estudianteTelefono', null) == null
+          || (
+            d.estudianteTelefono is string
+            && d.estudianteTelefono.matches('^[+][1-9][0-9]{1,14}$')
+          )
+        )
         && d.deporteNombre == deporte.nombre
         && d.entrenadorUid == deporte.entrenadorUid
         && d.estado == 'pendiente'
@@ -864,8 +996,18 @@ service cloud.firestore {
         && despues.estado == 'pendiente'
         && despues.diff(antes).affectedKeys().hasOnly([
           'estado', 'motivo', 'fechaInscripcion',
-          'fechaLimitePago', 'pagoId', 'historial'
+          'fechaLimitePago', 'pagoId', 'historial',
+          'estudianteTelefono'
         ])
+        && despues.get('estudianteTelefono', null)
+          == usuarioActual().get('telefono', null)
+        && (
+          despues.get('estudianteTelefono', null) == null
+          || (
+            despues.estudianteTelefono is string
+            && despues.estudianteTelefono.matches('^[+][1-9][0-9]{1,14}$')
+          )
+        )
         && despues.motivo == null
         && despues.pagoId == null
         && despues.fechaInscripcion is timestamp
@@ -1059,6 +1201,70 @@ service cloud.firestore {
     }
 
 
+    // H4: instalaciones compartidas por deportes y reservas particulares.
+    // Las consultas de disponibilidad pueden leer el catálogo sin permiso
+    // administrativo; solo el admin cambia el inventario físico.
+    match /espacios/{espacioId} {
+      allow get, list: if true;
+      allow create: if esAdministrador()
+        && datosEspacioValidos()
+        && request.resource.data.activo == true
+        && request.resource.data.creadoEn == request.time
+        && request.resource.data.actualizadoEn == request.time;
+      allow update: if esAdministrador()
+        && datosEspacioValidos()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nombre', 'tipo', 'descripcion', 'activo', 'actualizadoEn'
+        ])
+        && request.resource.data.creadoEn == resource.data.creadoEn
+        && request.resource.data.actualizadoEn == request.time;
+      allow delete: if false;
+    }
+
+    // Proyección pública sin datos personales: únicamente los tres campos
+    // de disponibilidad; siempre vinculada a una reserva privada y al control.
+    match /ocupacionesEspacios/{ocupacionId} {
+      allow get, list: if true;
+      allow create: if autenticado()
+        && !exists(rutaReservaEspacio(ocupacionId))
+        && existsAfter(rutaReservaEspacio(ocupacionId))
+        && getAfter(rutaReservaEspacio(ocupacionId)).data.usuarioUid == request.auth.uid
+        && ocupacionCoincideConReserva(ocupacionId)
+        && reservaConControl(ocupacionId, 'crear');
+      allow update: if false;
+      allow delete: if autenticado()
+        && exists(rutaReservaEspacio(ocupacionId))
+        && get(rutaReservaEspacio(ocupacionId)).data.usuarioUid == request.auth.uid
+        && request.time < get(rutaReservaEspacio(ocupacionId)).data.inicio
+        && getAfter(rutaReservaEspacio(ocupacionId)).data.estado == 'cancelada'
+        && reservaConControl(ocupacionId, 'cancelar');
+    }
+
+    // Propietario lee su motivo y estado; otros solo ven la proyección pública.
+    match /reservasEspacios/{reservaId} {
+      allow get, list: if esAdministrador()
+        || (autenticado() && resource.data.usuarioUid == request.auth.uid);
+      allow create: if datosReservaNuevaValidos()
+        && !exists(rutaOcupacionEspacio(reservaId))
+        && existsAfter(rutaOcupacionEspacio(reservaId))
+        && getAfter(rutaOcupacionEspacio(reservaId)).data.espacioId == request.resource.data.espacioId
+        && getAfter(rutaOcupacionEspacio(reservaId)).data.inicio == request.resource.data.inicio
+        && getAfter(rutaOcupacionEspacio(reservaId)).data.fin == request.resource.data.fin
+        && reservaConControl(reservaId, 'crear');
+      allow update: if autenticado()
+        && resource.data.usuarioUid == request.auth.uid
+        && resource.data.estado == 'activa'
+        && request.time < resource.data.inicio
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['estado', 'actualizadoEn'])
+        && request.resource.data.estado == 'cancelada'
+        && request.resource.data.actualizadoEn == request.time
+        && exists(rutaOcupacionEspacio(reservaId))
+        && !existsAfter(rutaOcupacionEspacio(reservaId))
+        && reservaConControl(reservaId, 'cancelar');
+      allow delete: if false;
+    }
+
     match /deportes/{codigo} {
       // La lectura del catalogo es publica (RF-05). No incluir datos privados.
       allow get, list: if true;
@@ -1206,12 +1412,17 @@ service cloud.firestore {
 
     // A2 Spark: un unico contador global para serializar agendas.
     match /control/{controlId} {
-      allow get: if controlId in ['agenda', 'resenas'] && esAdministrador();
+      allow get: if (controlId == 'agenda' && autenticado())
+        || (controlId == 'resenas' && esAdministrador());
       allow list: if false;
       allow create: if (
           controlId == 'agenda'
           && esAdministrador()
           && controlAgendaValido()
+          && request.resource.data.version == 1
+        ) || (
+          controlId == 'agenda'
+          && controlReservaValido()
           && request.resource.data.version == 1
         ) || (
           controlId == 'resenas'
@@ -1223,6 +1434,10 @@ service cloud.firestore {
           controlId == 'agenda'
           && esAdministrador()
           && controlAgendaValido()
+          && request.resource.data.version == resource.data.version + 1
+        ) || (
+          controlId == 'agenda'
+          && controlReservaValido()
           && request.resource.data.version == resource.data.version + 1
         ) || (
           controlId == 'resenas'
@@ -1264,6 +1479,13 @@ service cloud.firestore {
     // El ID es {codigo}_{AAAA-MM-DD}_{estudianteUid}: un registro por día.
     // Cada registro hace 2 lecturas (deporte e inscripción); por eso la app
     // guarda la lista en lotes de 8 y no pasa el límite de 20 por lote.
+    function fechaAsistenciaCoincide(asistenciaId, deporteId, estudianteUid, fecha) {
+      let anio = string(fecha.year());
+      let mes = (fecha.month() < 10 ? '0' : '') + string(fecha.month());
+      let dia = (fecha.day() < 10 ? '0' : '') + string(fecha.day());
+      return asistenciaId == deporteId + '_' + anio + '-' + mes + '-' + dia + '_' + estudianteUid;
+    }
+
     function asistenciaValida(asistenciaId) {
       let d = request.resource.data;
       return autenticado()
@@ -1282,9 +1504,7 @@ service cloud.firestore {
         && d.fecha is timestamp
         && d.fecha <= request.time + duration.value(1, 'd')
         && d.entrenadorUid == request.auth.uid
-        && asistenciaId.matches(
-          '^' + d.deporteId + '_[0-9]{4}-[0-9]{2}-[0-9]{2}_' + d.estudianteUid + '$'
-        )
+        && fechaAsistenciaCoincide(asistenciaId, d.deporteId, d.estudianteUid, d.fecha)
         && d.inscripcionId == d.estudianteUid + '_' + d.deporteId
         && get(rutaDeporte(d.deporteId)).data.entrenadorUid == request.auth.uid
         && get(rutaInscripcion(d.inscripcionId)).data.estado == 'confirmada'

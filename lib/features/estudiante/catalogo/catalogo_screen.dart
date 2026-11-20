@@ -46,6 +46,9 @@ class CatalogoScreen extends StatefulWidget {
   /// en una hoja que se abre con el botón "Filtros".
   static const double anchoPanelLateral = 840;
 
+  /// Ancho máximo del contenido en escritorio.
+  static const double anchoMaximo = 1200;
+
   @override
   State<CatalogoScreen> createState() => _CatalogoScreenState();
 }
@@ -236,9 +239,14 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
       style: tema.textTheme.bodySmall,
     );
 
+    // En escritorio el contenido se centra con un ancho máximo, para que
+    // la cuadrícula no se estire en pantallas muy anchas.
     return SingleChildScrollView(
       padding: EdgeInsets.all(lateral ? 32 : 16),
-      child: Column(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: CatalogoScreen.anchoMaximo),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -306,6 +314,8 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
             lista,
           ],
         ],
+          ),
+        ),
       ),
     );
   }

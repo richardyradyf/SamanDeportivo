@@ -34,6 +34,7 @@ Future<void> _mostrar(
   WidgetTester tester,
   double ancho, {
   List<DestinoNavegacion> destinos = _dosDestinos,
+  List<Widget> acciones = const [],
 }) async {
   tester.view.physicalSize = Size(ancho, 800);
   tester.view.devicePixelRatio = 1;
@@ -45,6 +46,7 @@ Future<void> _mostrar(
         titulo: 'Samán',
         subtitulo: 'Estudiante',
         destinos: destinos,
+        acciones: acciones,
       ),
     ),
   );
@@ -99,6 +101,78 @@ void main() {
     expect(menu.extended, isTrue);
     expect(find.text('SAMÁN'), findsOneWidget);
     expect(find.text('ESTUDIANTE'), findsOneWidget);
+  });
+
+  testWidgets('las acciones muestran texto en escritorio e ícono en móvil', (
+    tester,
+  ) async {
+    final acciones = [
+      AccionNavegacion(
+        etiqueta: 'Reservas',
+        icono: Icons.event_available_outlined,
+        onPressed: () {},
+      ),
+      AccionNavegacion(
+        etiqueta: 'Pagos',
+        icono: Icons.payments_outlined,
+        onPressed: () {},
+      ),
+    ];
+
+    await _mostrar(tester, 1280, acciones: acciones);
+    expect(find.widgetWithText(TextButton, 'Reservas'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Pagos'), findsOneWidget);
+
+    // Los dos accesos deben comenzar en la misma columna que los destinos.
+    final iconoInicio = tester.getTopLeft(find.byIcon(Icons.home)).dx;
+    final textoInicio = tester.getTopLeft(find.text('Inicio')).dx;
+    for (final (icono, etiqueta) in [
+      (Icons.event_available_outlined, 'Reservas'),
+      (Icons.payments_outlined, 'Pagos'),
+    ]) {
+      expect(
+        (tester.getTopLeft(find.byIcon(icono)).dx - iconoInicio).abs(),
+        lessThan(12),
+      );
+      expect(
+        (tester.getTopLeft(find.text(etiqueta)).dx - textoInicio).abs(),
+        lessThan(12),
+      );
+      expect(
+        tester.widget<Text>(find.text(etiqueta)).style,
+        AppTheme.claro.navigationRailTheme.unselectedLabelTextStyle,
+      );
+    }
+
+    await _mostrar(tester, 400, acciones: acciones);
+    expect(find.byTooltip('Reservas'), findsOneWidget);
+    expect(find.byTooltip('Pagos'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Reservas'), findsNothing);
+  });
+
+  testWidgets('las etiquetas largas del menú lateral no saltan de línea', (
+    tester,
+  ) async {
+    await _mostrar(
+      tester,
+      1280,
+      destinos: [
+        const DestinoNavegacion(
+          etiqueta: 'Mis disciplinas deportivas universitarias',
+          icono: Icons.sports_outlined,
+          iconoSeleccionado: Icons.sports,
+          pantalla: Text('Contenido'),
+        ),
+        _dosDestinos.last,
+      ],
+    );
+
+    final etiqueta = tester.widget<Text>(
+      find.text('Mis disciplinas deportivas universitarias'),
+    );
+    expect(etiqueta.maxLines, 1);
+    expect(etiqueta.softWrap, isFalse);
+    expect(etiqueta.overflow, TextOverflow.ellipsis);
   });
 
   testWidgets('tocar un destino cambia la sección visible', (tester) async {

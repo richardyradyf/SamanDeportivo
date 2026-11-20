@@ -197,6 +197,10 @@ class _EstudiantesAdminScreenState extends State<EstudiantesAdminScreen> {
                                             e.correo,
                                             style: tema.textTheme.bodySmall,
                                           ),
+                                          Text(
+                                            e.telefono ?? 'Teléfono no registrado',
+                                            style: tema.textTheme.bodySmall,
+                                          ),
                                         ],
                                       ),
                                     ),

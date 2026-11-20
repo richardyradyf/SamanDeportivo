@@ -19,6 +19,66 @@ class DestinoNavegacion {
   final Widget pantalla;
 }
 
+/// Acceso que mantiene un ícono compacto en móvil/tablet y muestra también
+/// su nombre en el menú lateral de escritorio.
+class AccionNavegacion extends StatelessWidget {
+  const AccionNavegacion({
+    super.key,
+    required this.etiqueta,
+    required this.icono,
+    required this.onPressed,
+  });
+
+  final String etiqueta;
+  final IconData icono;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width <= LayoutResponsivo.anchoEscritorio) {
+      return IconButton(
+        tooltip: etiqueta,
+        icon: Icon(icono),
+        onPressed: onPressed,
+      );
+    }
+
+    // En escritorio las acciones usan las mismas posiciones de ícono y
+    // etiqueta que los destinos del NavigationRail, en lugar de centrarse.
+    final estiloRail = NavigationRailTheme.of(context);
+    return SizedBox(
+      width: estiloRail.minExtendedWidth ?? 276,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.sidebarTexto,
+          alignment: Alignment.centerLeft,
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(0, 48),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 28, right: 16),
+          child: Row(
+            children: [
+              Icon(icono, size: 24),
+              const SizedBox(width: 24),
+              Flexible(
+                child: Text(
+                  etiqueta,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: estiloRail.unselectedLabelTextStyle,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Estructura común de las pantallas de inicio de los tres roles.
 ///
 /// Cambia la navegación según el ancho disponible (convenciones, sección 10):
@@ -190,6 +250,7 @@ class _LayoutResponsivoState extends State<LayoutResponsivo> {
           body: Row(
             children: [
               NavigationRail(
+                scrollable: true,
                 selectedIndex: indice,
                 onDestinationSelected: _seleccionar,
                 extended: expandido,
@@ -224,7 +285,12 @@ class _LayoutResponsivoState extends State<LayoutResponsivo> {
                     NavigationRailDestination(
                       icon: Icon(destino.icono),
                       selectedIcon: Icon(destino.iconoSeleccionado),
-                      label: Text(destino.etiqueta),
+                      label: Text(
+                        destino.etiqueta,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                 ],
               ),

@@ -6,6 +6,7 @@ import 'package:saman_deportivo/features/estudiante/screens/inicio_estudiante_sc
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/horario_sesion.dart';
+import 'package:saman_deportivo/models/inscripcion.dart';
 import 'package:saman_deportivo/models/resena.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
 import 'package:saman_deportivo/repositories/resena_repository.dart';
@@ -107,6 +108,23 @@ Resena _resena(
   fecha: DateTime(2026, 11, 5),
 );
 
+Inscripcion _inscripcion(
+  EstadoInscripcion estado, {
+  DateTime? fechaLimitePago,
+}) => Inscripcion(
+  id: 'estudiante-1_FUT-01',
+  estudianteUid: 'estudiante-1',
+  estudianteCedula: '27000000',
+  estudianteNombre: 'Ana Pérez',
+  estudianteCarnet: '20230001',
+  estudianteCorreo: 'ana@correo.unimet.edu.ve',
+  deporteId: 'FUT-01',
+  deporteNombre: 'Fútbol sala',
+  estado: estado,
+  fechaInscripcion: DateTime(2026, 11, 1),
+  fechaLimitePago: fechaLimitePago ?? DateTime(2099, 11, 2),
+);
+
 const _celular = Size(400, 900);
 const _escritorio = Size(1400, 1000);
 
@@ -201,6 +219,99 @@ void main() {
       await _tocar(tester, find.text('Inscribirme'));
 
       expect(elegido?.codigo, 'FUT-01');
+    });
+
+    testWidgets('inscripción confirmada muestra estado incluso sin cupos', (
+      tester,
+    ) async {
+      await _mostrar(
+        tester,
+        DetalleDeporteScreen(
+          deporte: _futbol(cupoMaximo: 2, cuposOcupados: 2),
+          deportes: _DeportesFalsos(),
+          inscripcion: _inscripcion(EstadoInscripcion.confirmada),
+          onInscribirse: (_) => fail('No debe reinscribirse'),
+        ),
+      );
+
+      final boton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, '¡Ya estás inscrito!'),
+      );
+      expect(boton.onPressed, isNull);
+      expect(find.text('Inscribirme'), findsNothing);
+    });
+
+    testWidgets('pendiente permite ir a pagos sin crear otra inscripción', (
+      tester,
+    ) async {
+      Inscripcion? elegida;
+      await _mostrar(
+        tester,
+        DetalleDeporteScreen(
+          deporte: _futbol(cupoMaximo: 1, cuposOcupados: 1),
+          deportes: _DeportesFalsos(),
+          inscripcion: _inscripcion(EstadoInscripcion.pendiente),
+          onInscribirse: (_) => fail('No debe volver a inscribirse'),
+          onConfirmarPago: (inscripcion) => elegida = inscripcion,
+        ),
+      );
+
+      await _tocar(tester, find.text('Confirmar Pago'));
+      expect(elegida?.id, 'estudiante-1_FUT-01');
+    });
+
+    testWidgets('pendiente vencida permite renovar aun con el cupo ocupado', (
+      tester,
+    ) async {
+      Deporte? elegido;
+      await _mostrar(
+        tester,
+        DetalleDeporteScreen(
+          deporte: _futbol(cupoMaximo: 1, cuposOcupados: 1),
+          deportes: _DeportesFalsos(),
+          inscripcion: _inscripcion(
+            EstadoInscripcion.pendiente,
+            fechaLimitePago: DateTime(2020),
+          ),
+          onInscribirse: (deporte) => elegido = deporte,
+        ),
+      );
+
+      await _tocar(tester, find.text('Renovar inscripción'));
+      expect(elegido?.codigo, 'FUT-01');
+    });
+
+    testWidgets('inscripción cancelada permite inscribirse nuevamente', (
+      tester,
+    ) async {
+      await _mostrar(
+        tester,
+        DetalleDeporteScreen(
+          deporte: _futbol(),
+          deportes: _DeportesFalsos(),
+          inscripcion: _inscripcion(EstadoInscripcion.cancelada),
+          onInscribirse: (_) {},
+        ),
+      );
+      expect(find.text('Inscribirme'), findsOneWidget);
+    });
+
+    testWidgets('no permite inscribirse mientras carga el estado', (
+      tester,
+    ) async {
+      await _mostrar(
+        tester,
+        DetalleDeporteScreen(
+          deporte: _futbol(),
+          deportes: _DeportesFalsos(),
+          verificandoInscripcion: true,
+          onInscribirse: (_) => fail('Todavía está verificando'),
+        ),
+      );
+      final boton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Verificando inscripción...'),
+      );
+      expect(boton.onPressed, isNull);
     });
 
     testWidgets('si el deporte se desactiva lo avisa', (tester) async {

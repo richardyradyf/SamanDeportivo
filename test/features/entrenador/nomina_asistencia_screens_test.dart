@@ -102,6 +102,41 @@ void main() {
     expect(find.text('Ana Pérez'), findsOneWidget);
     expect(find.textContaining('Cédula 28000001'), findsOneWidget);
     expect(find.textContaining('Carnet 20231001'), findsOneWidget);
+    expect(find.textContaining('Teléfono: No registrado'), findsOneWidget);
+    expect(find.text('Confirmada'), findsOneWidget);
+  });
+
+  testWidgets('la nómina muestra el teléfono con prefijo cuando está registrado',
+      (tester) async {
+    final conTelefono = Inscripcion(
+      id: 'est-2_BAL-01',
+      estudianteUid: 'est-2',
+      estudianteCedula: '29000002',
+      estudianteNombre: 'Luis Gómez',
+      estudianteCarnet: '20231002',
+      estudianteCorreo: 'estudiante2@correo.unimet.edu.ve',
+      estudianteTelefono: '+584121234567',
+      deporteId: 'BAL-01',
+      deporteNombre: 'Baloncesto',
+      entrenadorUid: 'ent-1',
+      estado: EstadoInscripcion.confirmada,
+      fechaInscripcion: DateTime(2026, 11, 8, 10),
+      fechaLimitePago: DateTime(2026, 11, 9, 10),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NominaScreen(
+          deportes: Stream.value([_deporte()]),
+          confirmadas: (_) => Stream.value([conTelefono]),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Luis Gómez'), findsOneWidget);
+    expect(find.textContaining('Teléfono: +584121234567'), findsOneWidget);
+    expect(find.text('Confirmada'), findsOneWidget);
   });
 
   testWidgets('la nómina avisa cuando no hay confirmados', (tester) async {
@@ -134,11 +169,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('08/11/2026'), findsOneWidget);
-    expect(find.text('Ausente'), findsOneWidget);
+    final marcador = find.byKey(const Key('asistencia-estado-est-1'));
+    expect(
+      tester.widget<SegmentedButton<EstadoAsistencia>>(marcador).selected,
+      isEmpty,
+    );
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(
+      find.descendant(of: marcador, matching: find.text('Presente')),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Presente'), findsOneWidget);
+    expect(
+      tester.widget<SegmentedButton<EstadoAsistencia>>(marcador).selected,
+      {EstadoAsistencia.presente},
+    );
 
     await tester.tap(find.text('Guardar asistencia'));
     await tester.pumpAndSettle();
@@ -177,6 +221,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Presente'), findsOneWidget);
+    expect(
+      tester.widget<SegmentedButton<EstadoAsistencia>>(
+        find.byKey(const Key('asistencia-estado-est-1')),
+      ).selected,
+      {EstadoAsistencia.presente},
+    );
   });
 }

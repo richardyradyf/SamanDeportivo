@@ -111,6 +111,18 @@ Future<void> _mostrar(WidgetTester tester, Widget pantalla) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _marcar(
+  WidgetTester tester,
+  String estudianteUid,
+  String estado,
+) async {
+  final marcador = find.byKey(Key('asistencia-estado-$estudianteUid'));
+  final opcion = find.descendant(of: marcador, matching: find.text(estado));
+  await tester.ensureVisible(opcion);
+  await tester.tap(opcion);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('Cálculos del historial', () {
     test('la semana va de lunes a lunes', () {
@@ -195,7 +207,7 @@ void main() {
   });
 
   group('Toma de asistencia', () {
-    testWidgets('guarda presente a quien se marcó y ausente al resto', (
+    testWidgets('exige marcar a cada estudiante antes de guardar', (
       tester,
     ) async {
       final repo = _AsistenciasFalsas();
@@ -211,8 +223,25 @@ void main() {
       );
 
       expect(find.text('05/11/2026'), findsOneWidget);
-      await tester.tap(find.text('Ana Pérez'));
-      await tester.pumpAndSettle();
+      expect(find.text('0 de 2 estudiantes verificados'), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Guardar asistencia'),
+        ).onPressed,
+        isNull,
+      );
+
+      await _marcar(tester, 'est-1', 'Presente');
+      expect(find.text('1 de 2 estudiantes verificados'), findsOneWidget);
+      expect(repo.guardadas, isEmpty);
+      expect(
+        tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Guardar asistencia'),
+        ).onPressed,
+        isNull,
+      );
+
+      await _marcar(tester, 'est-2', 'Ausente');
       await tester.tap(find.text('Guardar asistencia'));
       await tester.pumpAndSettle();
 
@@ -244,17 +273,18 @@ void main() {
         ),
       );
 
-      final luis = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Luis Gómez'),
+      final luis = tester.widget<SegmentedButton<EstadoAsistencia>>(
+        find.byKey(const Key('asistencia-estado-est-2')),
       );
-      final ana = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Ana Pérez'),
+      final ana = tester.widget<SegmentedButton<EstadoAsistencia>>(
+        find.byKey(const Key('asistencia-estado-est-1')),
       );
-      expect(luis.value, isTrue);
-      expect(ana.value, isFalse);
+      expect(luis.selected, {EstadoAsistencia.presente});
+      expect(ana.selected, isEmpty);
+      expect(find.text('1 de 2 estudiantes verificados'), findsOneWidget);
     });
 
-    testWidgets('"Marcar todos presentes" marca a toda la lista', (
+    testWidgets('no existe opción de marcar todos; cada persona es individual', (
       tester,
     ) async {
       final repo = _AsistenciasFalsas();
@@ -269,8 +299,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Marcar todos presentes'));
-      await tester.pumpAndSettle();
+      expect(find.text('Marcar todos presentes'), findsNothing);
+      await _marcar(tester, 'est-1', 'Presente');
+      await _marcar(tester, 'est-2', 'Presente');
       await tester.tap(find.text('Guardar asistencia'));
       await tester.pumpAndSettle();
 
@@ -279,6 +310,27 @@ void main() {
         repo.guardadas.every((a) => a.estado == EstadoAsistencia.presente),
         isTrue,
       );
+    });
+
+    testWidgets('el botón guardar queda junto a la lista, sin espacio vacío', (
+      tester,
+    ) async {
+      await _mostrar(
+        tester,
+        TomarAsistenciaScreen(
+          deportes: Stream.value([_futbol]),
+          confirmadas: _confirmadas,
+          asistencias: _AsistenciasFalsas(),
+          entrenadorUid: 'ent-1',
+          hoy: () => _hoy,
+        ),
+      );
+
+      final ultimaFila = find.byKey(const Key('asistencia-estado-est-2'));
+      final boton = find.widgetWithText(FilledButton, 'Guardar asistencia');
+      final espacio = tester.getTopLeft(boton).dy -
+          tester.getBottomLeft(ultimaFila).dy;
+      expect(espacio, inInclusiveRange(0, 70));
     });
 
     testWidgets('si no se puede guardar, avisa', (tester) async {
@@ -293,6 +345,8 @@ void main() {
         ),
       );
 
+      await _marcar(tester, 'est-1', 'Presente');
+      await _marcar(tester, 'est-2', 'Ausente');
       await tester.tap(find.text('Guardar asistencia'));
       await tester.pumpAndSettle();
 
@@ -300,6 +354,131 @@ void main() {
         find.text('No se pudo guardar la asistencia. Inténtalo de nuevo.'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('sesión ya guardada muestra banner informativo', (tester) async {
+      final dia = DateTime(2026, 11, 5);
+      await _mostrar(
+        tester,
+        TomarAsistenciaScreen(
+          deportes: Stream.value([_futbol]),
+          confirmadas: _confirmadas,
+          asistencias: _AsistenciasFalsas(previas: [
+            _registro('est-1', 'Ana Pérez', dia, EstadoAsistencia.presente),
+            _registro('est-2', 'Luis Gómez', dia, EstadoAsistencia.presente),
+          ]),
+          entrenadorUid: 'ent-1',
+          hoy: () => _hoy,
+        ),
+      );
+
+      expect(
+        find.textContaining('ya tiene asistencia guardada'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('al cambiar estado aparece banner de corrección', (tester) async {
+      final dia = DateTime(2026, 11, 5);
+      await _mostrar(
+        tester,
+        TomarAsistenciaScreen(
+          deportes: Stream.value([_futbol]),
+          confirmadas: _confirmadas,
+          asistencias: _AsistenciasFalsas(previas: [
+            _registro('est-1', 'Ana Pérez', dia, EstadoAsistencia.presente),
+            _registro('est-2', 'Luis Gómez', dia, EstadoAsistencia.presente),
+          ]),
+          entrenadorUid: 'ent-1',
+          hoy: () => _hoy,
+        ),
+      );
+
+      // Cambiar uno de los estados genera diff con _guardados
+      await _marcar(tester, 'est-1', 'Ausente');
+
+      expect(
+        find.textContaining('Estás corrigiendo una asistencia ya guardada'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('guardar corrección muestra "Asistencia corregida."', (tester) async {
+      final dia = DateTime(2026, 11, 5);
+      final repo = _AsistenciasFalsas(previas: [
+        _registro('est-1', 'Ana Pérez', dia, EstadoAsistencia.presente),
+        _registro('est-2', 'Luis Gómez', dia, EstadoAsistencia.presente),
+      ]);
+      await _mostrar(
+        tester,
+        TomarAsistenciaScreen(
+          deportes: Stream.value([_futbol]),
+          confirmadas: _confirmadas,
+          asistencias: repo,
+          entrenadorUid: 'ent-1',
+          hoy: () => _hoy,
+        ),
+      );
+
+      await _marcar(tester, 'est-2', 'Ausente');
+      await tester.tap(find.text('Guardar asistencia'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Asistencia corregida.'), findsOneWidget);
+    });
+
+    testWidgets('sin marcar todos resalta las filas pendientes al intentar guardar',
+        (tester) async {
+      await _mostrar(
+        tester,
+        TomarAsistenciaScreen(
+          deportes: Stream.value([_futbol]),
+          confirmadas: _confirmadas,
+          asistencias: _AsistenciasFalsas(),
+          entrenadorUid: 'ent-1',
+          hoy: () => _hoy,
+        ),
+      );
+
+      // Marcar solo a Ana; Luis queda sin registrar
+      await _marcar(tester, 'est-1', 'Presente');
+
+      // El botón sigue deshabilitado mientras falte algún estudiante
+      expect(
+        tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Guardar asistencia'),
+        ).onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('cambiar fecha con cambios sin guardar muestra diálogo', (tester) async {
+      await _mostrar(
+        tester,
+        TomarAsistenciaScreen(
+          deportes: Stream.value([_futbol]),
+          confirmadas: _confirmadas,
+          asistencias: _AsistenciasFalsas(),
+          entrenadorUid: 'ent-1',
+          hoy: () => _hoy,
+        ),
+      );
+
+      // Marcar a uno (hay cambios respecto a _guardados vacío)
+      await _marcar(tester, 'est-1', 'Presente');
+
+      // Pulsar "Cambiar fecha" debe mostrar el diálogo de descartar
+      await tester.tap(find.text('Cambiar fecha'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar cambios?'), findsOneWidget);
+      expect(find.text('Seguir editando'), findsOneWidget);
+
+      // Cancelar: volvemos a la pantalla sin cambiar la fecha
+      await tester.tap(find.text('Seguir editando'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('05/11/2026'), findsOneWidget);
     });
   });
 

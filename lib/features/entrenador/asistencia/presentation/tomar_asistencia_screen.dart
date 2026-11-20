@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -66,10 +67,16 @@ class _SesionState extends State<_Sesion> {
   late final Stream<List<Inscripcion>> _inscritos =
       widget.confirmadas(widget.deporte.codigo);
   late DateTime _dia = widget.dia;
-  Map<String, bool> _presentes = {};
+  // Sin valor significa que el entrenador TODAVÍA no verificó al estudiante.
+  Map<String, EstadoAsistencia> _marcados = {};
+  Map<String, EstadoAsistencia> _guardados = {};
+  bool _mostrarFaltantes = false;
   bool _guardando = false;
+  bool _cargandoPrevios = true;
 
   DateTime get _siguiente => DateTime(_dia.year, _dia.month, _dia.day + 1);
+  bool get _yaRegistrada => _guardados.isNotEmpty;
+  bool get _hayCambios => !mapEquals(_marcados, _guardados);
 
   @override
   void initState() {
@@ -77,45 +84,107 @@ class _SesionState extends State<_Sesion> {
     _cargar();
   }
 
-  void _aviso(String mensaje) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
+  void _aviso(String mensaje, {bool error = false}) {
+    final mensajero = ScaffoldMessenger.of(context);
+    mensajero.hideCurrentSnackBar();
+    mensajero.showSnackBar(SnackBar(
+      content: Text(mensaje),
+      backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+    ));
+  }
 
   /// Si ya hay asistencia de ese día, se carga para poder corregirla.
   Future<void> _cargar() async {
     final dia = _dia;
+    if (!_cargandoPrevios) {
+      setState(() => _cargandoPrevios = true);
+    }
     try {
       final previos = await widget.asistencias
           .observarDeDeporte(widget.deporte.codigo, desde: dia, hasta: _siguiente)
           .first;
       if (!mounted || dia != _dia) return;
-      setState(() => _presentes = {
-            for (final a in previos) a.estudianteUid: a.estuvoPresente,
-          });
+      final guardados = {for (final a in previos) a.estudianteUid: a.estado};
+      setState(() {
+        _guardados = guardados;
+        _marcados = {...guardados};
+        _mostrarFaltantes = false;
+        _cargandoPrevios = false;
+      });
     } catch (_) {
-      if (mounted) _aviso('No se pudo cargar la asistencia de ese día.');
+      if (!mounted || dia != _dia) return;
+      setState(() => _cargandoPrevios = false);
+      _aviso('No se pudo cargar la asistencia de ese día.', error: true);
     }
   }
 
+  Future<bool> _descartarCambios() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Descartar cambios?'),
+        content: const Text(
+          'Tienes cambios de asistencia sin guardar para esta fecha. Si cambias de día se perderán.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Seguir editando'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Descartar'),
+          ),
+        ],
+      ),
+    );
+    return confirmar ?? false;
+  }
+
   Future<void> _elegirFecha() async {
+    if (_hayCambios && !await _descartarCambios()) return;
+    if (!mounted) return;
     final fecha = await showDatePicker(
       context: context,
       initialDate: _dia,
       firstDate: DateTime(2024),
       lastDate: DateTime.now(),
     );
-    if (fecha == null) return;
+    if (fecha == null || !mounted) return;
     setState(() {
       _dia = soloDia(fecha);
-      _presentes = {};
+      _guardados = {};
+      _marcados = {};
+      _mostrarFaltantes = false;
     });
     _cargar();
   }
 
+  int _sinRegistrar(List<Inscripcion> lista) =>
+      lista.where((i) => !_marcados.containsKey(i.estudianteUid)).length;
+
+  String _textoFaltan(int faltan) => faltan == 1
+      ? 'Falta 1 estudiante por marcar. Marca presente o ausente a todos.'
+      : 'Faltan $faltan estudiantes por marcar. Marca a todos antes de guardar.';
+
   Future<void> _guardar() async {
+    if (_guardando) return;
     setState(() => _guardando = true);
     try {
-      // Una consulta nueva: la lista de la pantalla ya está escuchando la otra.
       final inscritos = await widget.confirmadas(widget.deporte.codigo).first;
+      final faltan = _sinRegistrar(inscritos);
+      if (faltan > 0) {
+        if (mounted) {
+          setState(() {
+            _mostrarFaltantes = true;
+            _guardando = false;
+          });
+          _aviso(_textoFaltan(faltan), error: true);
+        }
+        return;
+      }
+
+      final correccion = _yaRegistrada;
       await widget.asistencias.guardarSesion([
         for (final i in inscritos)
           Asistencia.registrar(
@@ -125,14 +194,20 @@ class _SesionState extends State<_Sesion> {
             deporteId: widget.deporte.codigo,
             entrenadorUid: widget.entrenadorUid,
             fecha: _dia,
-            estado: _presentes[i.estudianteUid] == true
-                ? EstadoAsistencia.presente
-                : EstadoAsistencia.ausente,
+            estado: _marcados[i.estudianteUid]!,
           ),
       ]);
-      if (mounted) _aviso('Asistencia guardada.');
+      if (mounted) {
+        setState(() {
+          _guardados = {..._marcados};
+          _mostrarFaltantes = false;
+        });
+        _aviso(correccion ? 'Asistencia corregida.' : 'Asistencia guardada.');
+      }
     } catch (_) {
-      if (mounted) _aviso('No se pudo guardar la asistencia. Inténtalo de nuevo.');
+      if (mounted) {
+        _aviso('No se pudo guardar la asistencia. Inténtalo de nuevo.', error: true);
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -140,75 +215,179 @@ class _SesionState extends State<_Sesion> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.event),
-          title: Text(DateFormat('dd/MM/yyyy').format(_dia)),
-          trailing: TextButton(
-            onPressed: _elegirFecha,
-            child: const Text('Cambiar fecha'),
-          ),
-        ),
-        Expanded(
-          child: StreamBuilder<List<Inscripcion>>(
-            stream: _inscritos,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Center(child: Text('No se pudo cargar la lista.'));
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final lista = [...snapshot.data!]
-                ..sort((a, b) => a.estudianteNombre.compareTo(b.estudianteNombre));
-              if (lista.isEmpty) {
-                return const Center(child: Text('No hay inscritos confirmados.'));
-              }
-              return ListView(
-                children: [
-                  // Como en el Figma: lo normal es que casi todos vengan, así
-                  // que se marcan todos y se desmarca a los que faltaron.
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: OutlinedButton(
-                        onPressed: () => setState(() {
-                          for (final i in lista) {
-                            _presentes[i.estudianteUid] = true;
-                          }
-                        }),
-                        child: const Text('Marcar todos presentes'),
-                      ),
-                    ),
-                  ),
-                  for (final i in lista)
-                    SwitchListTile(
-                      title: Text(i.estudianteNombre),
-                      subtitle: Text(
-                        _presentes[i.estudianteUid] == true ? 'Presente' : 'Ausente',
-                      ),
-                      value: _presentes[i.estudianteUid] ?? false,
-                      onChanged: (v) =>
-                          setState(() => _presentes[i.estudianteUid] = v),
-                    ),
-                ],
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _guardando ? null : _guardar,
-              child: const Text('Guardar asistencia'),
+    return StreamBuilder<List<Inscripcion>>(
+      stream: _inscritos,
+      builder: (context, snapshot) {
+        final lista = [...?snapshot.data]
+          ..sort((a, b) => a.estudianteNombre.compareTo(b.estudianteNombre));
+        final marcados = lista
+            .where((i) => _marcados.containsKey(i.estudianteUid))
+            .length;
+        final todosMarcados = lista.isNotEmpty && marcados == lista.length;
+
+        // La lista y el botón comparten el mismo scroll: con pocos alumnos,
+        // «Guardar asistencia» queda justo debajo, no al fondo de la pantalla.
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.event),
+              title: Text(DateFormat('dd/MM/yyyy').format(_dia)),
+              trailing: TextButton(
+                onPressed: _elegirFecha,
+                child: const Text('Cambiar fecha'),
+              ),
             ),
-          ),
-        ),
-      ],
+            if (_yaRegistrada && !_cargandoPrevios)
+              Card(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _hayCambios
+                              ? 'Estás corrigiendo una asistencia ya guardada. Guarda para actualizarla.'
+                              : 'Esta fecha ya tiene asistencia guardada. Puedes corregirla.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (snapshot.hasError)
+              const Text('No se pudo cargar la lista.')
+            else if (!snapshot.hasData || _cargandoPrevios)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (lista.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text('No hay inscritos confirmados.'),
+              )
+            else ...[
+              Text(
+                'Verifica a cada estudiante y marca presente o ausente.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$marcados de ${lista.length} estudiantes verificados',
+                key: const Key('asistencia-progreso'),
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 12),
+              for (final i in lista)
+                Builder(
+                  builder: (context) {
+                    final sinMarcar = !_marcados.containsKey(i.estudianteUid);
+                    final resaltar = _mostrarFaltantes && sinMarcar;
+                    final colores = Theme.of(context).colorScheme;
+                    return Card(
+                      key: Key('fila-asistencia-${i.estudianteUid}'),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: resaltar
+                            ? BorderSide(color: colores.error, width: 1.5)
+                            : BorderSide.none,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    i.estudianteNombre,
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                ),
+                                if (resaltar)
+                                  Text(
+                                    'Sin registrar',
+                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                          color: colores.error,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            SegmentedButton<EstadoAsistencia>(
+                              key: Key('asistencia-estado-${i.estudianteUid}'),
+                              showSelectedIcon: false,
+                              emptySelectionAllowed: true,
+                              segments: const [
+                                ButtonSegment(
+                                  value: EstadoAsistencia.presente,
+                                  label: Text('Presente'),
+                                ),
+                                ButtonSegment(
+                                  value: EstadoAsistencia.ausente,
+                                  label: Text('Ausente'),
+                                ),
+                              ],
+                              selected: _marcados[i.estudianteUid] == null
+                                  ? <EstadoAsistencia>{}
+                                  : {_marcados[i.estudianteUid]!},
+                              onSelectionChanged: _guardando
+                                  ? null
+                                  : (elegidos) => setState(() {
+                                        if (elegidos.isEmpty) {
+                                          _marcados.remove(i.estudianteUid);
+                                        } else {
+                                          _marcados[i.estudianteUid] = elegidos.first;
+                                        }
+                                      }),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _guardando || !todosMarcados ? null : _guardar,
+                  child: _guardando
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Guardando asistencia...'),
+                          ],
+                        )
+                      : const Text('Guardar asistencia'),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

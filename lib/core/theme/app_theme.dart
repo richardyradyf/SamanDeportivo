@@ -143,11 +143,11 @@ abstract final class AppTheme {
         backgroundColor: AppColors.superficie,
         indicatorColor: AppColors.suave,
       ),
-      // Figma: sidebar verde oscuro de 240 px en escritorio.
+      // Sidebar verde oscuro con espacio para etiquetas largas y acciones.
       // La barra inferior movil y el NavigationDrawer conservan su tema claro.
       navigationRailTheme: const NavigationRailThemeData(
         backgroundColor: AppColors.primarioOscuro,
-        minExtendedWidth: 240,
+        minExtendedWidth: 276,
         useIndicator: true,
         indicatorColor: AppColors.sidebarSeleccion,
         indicatorShape: RoundedRectangleBorder(

@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:saman_deportivo/features/admin/entrenadores/domain/gestion_agenda_entrenador.dart';
+import 'package:saman_deportivo/features/reservas/domain/validaciones_reserva.dart';
 import 'package:saman_deportivo/models/deporte.dart';
 import 'package:saman_deportivo/models/horario_sesion.dart';
+import 'package:saman_deportivo/models/reserva_espacio.dart';
 
 /// Agenda compatible con Firebase Spark: no utiliza Cloud Functions.
 ///
@@ -15,11 +17,9 @@ import 'package:saman_deportivo/models/horario_sesion.dart';
 /// catalogo dentro de la transaccion. No usar como solucion escalable para
 /// miles de deportes sin migrar a indices de ocupacion por franja horaria.
 class FirestoreAgendaGateway implements AgendaMutaciones {
-  FirestoreAgendaGateway({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  }) : _db = firestore ?? FirebaseFirestore.instance,
-       _auth = auth ?? FirebaseAuth.instance;
+  FirestoreAgendaGateway({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
@@ -58,7 +58,13 @@ class FirestoreAgendaGateway implements AgendaMutaciones {
       const GetOptions(source: Source.server),
     );
     final versionEsperada = _version(controlPrevio.data());
-    final catalogo = await _db.collection('deportes').get(
+    final catalogo = await _db
+        .collection('deportes')
+        .get(const GetOptions(source: Source.server));
+    // Incluye reservas particulares; comparten control/agenda con las clases.
+    // Si alguna se crea durante esta lectura, cambia la versión y se rechaza
+    // la operación antes de guardar los nuevos horarios.
+    final reservasPrevias = await _db.collection('ocupacionesEspacios').get(
       const GetOptions(source: Source.server),
     );
 
@@ -135,6 +141,60 @@ class FirestoreAgendaGateway implements AgendaMutaciones {
           horarios: horarios,
           deportes: actuales,
         );
+      }
+
+      ValidacionesAgendaEntrenador.validarSinConflictosDeEspacio(
+        codigoDeporte: deporte.codigo,
+        horarios: horarios,
+        deportes: actuales,
+      );
+
+      // Las agendas históricas no tienen espacioId y se migrarán desde la
+      // interfaz. Toda referencia nueva debe apuntar a un espacio activo.
+      final ids = horarios.map((h) => h.espacioId).whereType<String>().toSet();
+      for (final id in ids) {
+        final espacio = await tx.get(_db.collection('espacios').doc(id));
+        if (espacio.data()?['activo'] != true) {
+          throw const AgendaEntrenadorException(
+            'El espacio seleccionado no existe o está inactivo. Recarga.',
+          );
+        }
+      }
+      if (ids.isNotEmpty && horarios.any((h) => h.espacioId == null)) {
+        throw const AgendaEntrenadorException(
+          'Todas las sesiones nuevas deben elegir un espacio registrado.',
+        );
+      }
+
+      // Una clase semanal también debe respetar las reservas de prácticas y
+      // eventos. Antes de modificar la agenda, se releen las ocupaciones
+      // dentro de la misma transacción que bloquea control/agenda.
+      final ocupaciones = <OcupacionEspacio>[];
+      for (final candidato in reservasPrevias.docs) {
+        final actual = await tx.get(candidato.reference);
+        if (actual.data() == null) {
+          throw const AgendaEntrenadorException(
+            'Las reservas cambiaron. Recarga la agenda.',
+          );
+        }
+        ocupaciones.add(OcupacionEspacio.fromMap(actual.id, actual.data()!));
+      }
+      for (final horario in horarios) {
+        if (horario.espacioId == null) continue;
+        for (final ocupacion in ocupaciones) {
+          if (ocupacion.espacioId == horario.espacioId &&
+              ocupacion.fin.isAfter(DateTime.now()) &&
+              ValidacionesReserva.reservaCruzaClaseSemanal(
+                inicioReserva: ocupacion.inicio,
+                finReserva: ocupacion.fin,
+                horario: horario,
+              )) {
+            throw const AgendaEntrenadorException(
+              'Una reserva existente utiliza ese espacio y horario. '
+              'Elige otra franja.',
+            );
+          }
+        }
       }
 
       final dias = horarios.map((h) => h.dia.name).toSet().toList();
