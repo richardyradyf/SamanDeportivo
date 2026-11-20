@@ -43,14 +43,38 @@ class AccionNavegacion extends StatelessWidget {
       );
     }
 
-    return TextButton.icon(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.sidebarTexto,
-        minimumSize: const Size(176, 44),
+    // En escritorio las acciones usan las mismas posiciones de ícono y
+    // etiqueta que los destinos del NavigationRail, en lugar de centrarse.
+    final estiloRail = NavigationRailTheme.of(context);
+    return SizedBox(
+      width: estiloRail.minExtendedWidth ?? 276,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.sidebarTexto,
+          alignment: Alignment.centerLeft,
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(0, 48),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 28, right: 16),
+          child: Row(
+            children: [
+              Icon(icono, size: 24),
+              const SizedBox(width: 24),
+              Flexible(
+                child: Text(
+                  etiqueta,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: estiloRail.unselectedLabelTextStyle,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      icon: Icon(icono),
-      label: Text(etiqueta, maxLines: 1, softWrap: false),
     );
   }
 }
