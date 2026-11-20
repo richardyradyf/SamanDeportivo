@@ -481,7 +481,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byTooltip('Reservas de espacios'));
+    await tester.tap(find.byTooltip('Reservas'));
     await tester.pumpAndSettle();
 
     expect(find.text('Reservas de espacios'), findsOneWidget);
