@@ -123,6 +123,27 @@ void main() {
     expect(find.widgetWithText(TextButton, 'Reservas'), findsOneWidget);
     expect(find.widgetWithText(TextButton, 'Pagos'), findsOneWidget);
 
+    // Los dos accesos deben comenzar en la misma columna que los destinos.
+    final iconoInicio = tester.getTopLeft(find.byIcon(Icons.home)).dx;
+    final textoInicio = tester.getTopLeft(find.text('Inicio')).dx;
+    for (final (icono, etiqueta) in [
+      (Icons.event_available_outlined, 'Reservas'),
+      (Icons.payments_outlined, 'Pagos'),
+    ]) {
+      expect(
+        (tester.getTopLeft(find.byIcon(icono)).dx - iconoInicio).abs(),
+        lessThan(12),
+      );
+      expect(
+        (tester.getTopLeft(find.text(etiqueta)).dx - textoInicio).abs(),
+        lessThan(12),
+      );
+      expect(
+        tester.widget<Text>(find.text(etiqueta)).style,
+        AppTheme.claro.navigationRailTheme.unselectedLabelTextStyle,
+      );
+    }
+
     await _mostrar(tester, 400, acciones: acciones);
     expect(find.byTooltip('Reservas'), findsOneWidget);
     expect(find.byTooltip('Pagos'), findsOneWidget);
