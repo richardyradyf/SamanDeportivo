@@ -55,6 +55,7 @@ class AuthGate extends StatelessWidget {
     this.obtenerInscripciones,
     this.cancelarInscripcion,
     this.inscribirEstudiante,
+    this.expirarVencidas,
   });
 
   final Widget sinSesion;
@@ -68,6 +69,9 @@ class AuthGate extends StatelessWidget {
   /// Función opcional para cancelar una inscripción.
   final CancelarInscripcion? cancelarInscripcion;
   final InscribirEstudiante? inscribirEstudiante;
+
+  /// Expira las inscripciones vencidas del estudiante que entra.
+  final Future<int> Function()? expirarVencidas;
 
   static Widget _perfilDeFirestore(Persona persona, SesionController sesion) {
     return PerfilScreen(
@@ -131,6 +135,7 @@ class AuthGate extends StatelessWidget {
         perfil: construirPerfil(persona, sesion),
         pagos: construirPagos(persona),
         inscripcionesStream: obtenerInscripciones?.call(persona.uid),
+        expirarVencidas: expirarVencidas,
         onCancelarInscripcion: cancelarInscripcion == null
             ? null
             : (inscripcion) {

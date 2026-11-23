@@ -40,12 +40,14 @@ class MisInscripcionesScreen extends StatelessWidget {
         AppColors.disponibleFondo,
         AppColors.disponibleTexto,
       ),
-      EstadoInscripcion.rechazada ||
-      EstadoInscripcion.cancelada => (
+      EstadoInscripcion.rechazada || EstadoInscripcion.cancelada => (
         AppColors.completoFondo,
         AppColors.completoTexto,
       ),
-      EstadoInscripcion.expirada => (AppColors.borde, AppColors.textoSecundario),
+      EstadoInscripcion.expirada => (
+        AppColors.borde,
+        AppColors.textoSecundario,
+      ),
     };
   }
 
@@ -218,7 +220,9 @@ class MisInscripcionesScreen extends StatelessWidget {
             if (inscripcion.motivo != null && inscripcion.motivo!.isNotEmpty)
               _Dato(
                 icono: Icons.info_outline,
-                texto: 'Motivo: ${inscripcion.motivo}',
+                texto: inscripcion.motivo == Inscripcion.motivoPlazoVencido
+                    ? 'Motivo: plazo de pago vencido'
+                    : 'Motivo: ${inscripcion.motivo}',
               ),
             if (inscripcion.ocupaCupo) ...[
               const SizedBox(height: 8),

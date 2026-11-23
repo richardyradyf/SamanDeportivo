@@ -36,6 +36,7 @@ class InicioEstudianteScreen extends StatefulWidget {
     this.reloj,
     this.inscripcionesStream,
     this.onCancelarInscripcion,
+    this.expirarVencidas,
     this.deportes,
     this.resenas,
     this.uid,
@@ -59,6 +60,9 @@ class InicioEstudianteScreen extends StatefulWidget {
   // Funcionalidades de inscripciones de Mariana.
   final Stream<List<Inscripcion>>? inscripcionesStream;
   final ValueChanged<Inscripcion>? onCancelarInscripcion;
+
+  /// Libera los cupos de las inscripciones sin pagar al entrar.
+  final Future<int> Function()? expirarVencidas;
 
   // Funcionalidades del catálogo de Gabriel.
   final DeporteRepository? deportes;
@@ -93,6 +97,16 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
   void initState() {
     super.initState();
     _escuchar(widget.inscripcionesStream);
+    _expirarVencidas();
+  }
+
+  /// Si falla no bloquea la pantalla: se reintenta en el próximo ingreso.
+  Future<void> _expirarVencidas() async {
+    try {
+      await widget.expirarVencidas?.call();
+    } catch (error) {
+      debugPrint('No se pudieron expirar las inscripciones: $error');
+    }
   }
 
   @override
