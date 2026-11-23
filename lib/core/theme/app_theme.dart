@@ -139,9 +139,20 @@ abstract final class AppTheme {
       ),
 
       // Navegación (la usa el LayoutResponsivo de Gabriel).
-      navigationBarTheme: const NavigationBarThemeData(
+      navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.superficie,
         indicatorColor: AppColors.suave,
+        // Cinco destinos en un teléfono: la etiqueta va en una sola línea.
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (estados) => TextStyle(
+            fontSize: 10.5,
+            letterSpacing: 0,
+            overflow: TextOverflow.ellipsis,
+            fontWeight: estados.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w500,
+          ),
+        ),
       ),
       // Sidebar verde oscuro con espacio para etiquetas largas y acciones.
       // La barra inferior movil y el NavigationDrawer conservan su tema claro.
