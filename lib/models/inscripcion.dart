@@ -38,6 +38,8 @@ class CambioEstado {
 /// Colección `inscripciones`; el ID es `{estudianteUid}_{codigoDeporte}`,
 /// lo que impide inscribirse dos veces en el mismo deporte.
 class Inscripcion {
+  /// Motivo que exigen las reglas de Firestore al expirar por falta de pago.
+  static const motivoPlazoVencido = 'plazo_vencido';
   final String id;
   final String estudianteUid;
 
