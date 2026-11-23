@@ -45,6 +45,13 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         .collection('inscripciones')
         .doc(inscripcionId);
 
+    // Las reglas no renuevan una pendiente vencida: primero pasa a expirada
+    // y libera su cupo; después la transacción la reinscribe.
+    await _expirarSiVencida(
+      inscripcionId,
+      motivo: Inscripcion.motivoPlazoVencido,
+    );
+
     return firestore.runTransaction((transaction) async {
       final estudianteDoc = await transaction.get(estudianteRef);
       final deporteDoc = await transaction.get(deporteRef);
@@ -121,7 +128,7 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
             ? anterior.conEstado(
                 EstadoInscripcion.expirada,
                 responsableUid: estudiante.uid,
-                motivo: 'Plazo de pago vencido',
+                motivo: Inscripcion.motivoPlazoVencido,
                 fecha: ahora,
               )
             : anterior;
@@ -309,7 +316,13 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         fecha: ahora,
       );
 
-      transaction.update(inscripcionRef, expirada.toMap());
+      // Las reglas solo permiten cambiar estos tres campos al expirar.
+      final datos = expirada.toMap();
+      transaction.update(inscripcionRef, {
+        'estado': datos['estado'],
+        'motivo': datos['motivo'],
+        'historial': datos['historial'],
+      });
 
       transaction.update(deporteRef, {
         'cuposOcupados': deporte.cuposOcupados - 1,
@@ -337,15 +350,18 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
         .collection('inscripciones')
         .where('estudianteUid', isEqualTo: usuario.uid)
         .where('estado', isEqualTo: EstadoInscripcion.pendiente.name)
-        .where('fechaLimitePago', isLessThan: Timestamp.fromDate(ahora))
         .get();
 
     int totalExpiradas = 0;
 
     for (final documento in consulta.docs) {
+      // Se filtra aquí para no depender de un índice compuesto.
+      final limite = documento.data()['fechaLimitePago'];
+      if (limite is! Timestamp || !ahora.isAfter(limite.toDate())) continue;
+
       final expirada = await _expirarSiVencida(
         documento.id,
-        motivo: 'Plazo de pago vencido',
+        motivo: Inscripcion.motivoPlazoVencido,
       );
 
       if (expirada) {
