@@ -18,6 +18,7 @@ import 'package:saman_deportivo/models/enums.dart';
 import 'package:saman_deportivo/models/inscripcion.dart';
 import 'package:saman_deportivo/repositories/asistencia_repository.dart';
 import 'package:saman_deportivo/repositories/deporte_repository.dart';
+import 'package:saman_deportivo/repositories/inscripcion_repository.dart';
 import 'package:saman_deportivo/repositories/resena_repository.dart';
 
 /// Pantalla de inicio del estudiante, según el Figma:
@@ -217,6 +218,12 @@ class _InicioEstudianteScreenState extends State<InicioEstudianteScreen> {
                               'Está pendiente de pago.',
                             ),
                           ),
+                        );
+                      } on InscripcionException catch (error) {
+                        if (!context.mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(error.mensaje)),
                         );
                       } catch (error) {
                         if (!context.mounted) return;

@@ -13,7 +13,8 @@ class InscripcionException implements Exception {
   static const yaInscrito = InscripcionException('Ya estás inscrito en este deporte');
   static const sinCupos = InscripcionException('No quedan cupos en este deporte');
   static const estudianteInactivo = InscripcionException(
-    'Tu estado no permite inscribirte. Consulta con la administración',
+    'No puedes inscribirte porque tu estado de estudiante es inactivo. '
+    'Consulta con la administración.',
   );
   static const deporteInactivo = InscripcionException('Este deporte no está disponible');
 

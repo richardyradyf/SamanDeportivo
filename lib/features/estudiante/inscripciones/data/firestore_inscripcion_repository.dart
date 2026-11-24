@@ -52,10 +52,10 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
       motivo: Inscripcion.motivoPlazoVencido,
     );
 
-    return firestore.runTransaction((transaction) async {
+    final inscripcion = await firestore.runTransaction<Inscripcion?>((
+      transaction,
+    ) async {
       final estudianteDoc = await transaction.get(estudianteRef);
-      final deporteDoc = await transaction.get(deporteRef);
-      final inscripcionDoc = await transaction.get(inscripcionRef);
 
       if (!estudianteDoc.exists || estudianteDoc.data() == null) {
         throw const InscripcionException('No se encontró el estudiante.');
@@ -75,8 +75,14 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
       );
 
       if (!estudianteActual.estaActivo) {
-        throw InscripcionException.estudianteInactivo;
+        // En web, una excepción dentro de la transacción puede llegar a la
+        // pantalla como un error de JavaScript. null indica este rechazo sin
+        // escribir documentos ni consumir cupos; el error se lanza fuera.
+        return null;
       }
+
+      final deporteDoc = await transaction.get(deporteRef);
+      final inscripcionDoc = await transaction.get(inscripcionRef);
 
       if (!deporteDoc.exists || deporteDoc.data() == null) {
         throw InscripcionException.deporteInactivo;
@@ -146,6 +152,12 @@ class FirestoreInscripcionRepository implements InscripcionRepository {
 
       return nuevaInscripcion;
     });
+
+    if (inscripcion == null) {
+      throw InscripcionException.estudianteInactivo;
+    }
+
+    return inscripcion;
   }
 
   // ---------------------------------------------------------
